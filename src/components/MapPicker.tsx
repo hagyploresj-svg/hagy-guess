@@ -28,6 +28,15 @@ interface Props {
   others?: OtherPin[];
 }
 
+interface PlaceLabel {
+  name: string;
+  lat: number;
+  lng: number;
+  minZoom?: number;
+  maxZoom?: number;
+  type?: 'country' | 'region' | 'city';
+}
+
 const pin = (color: string) =>
   L.divIcon({
     className: '',
@@ -36,12 +45,9 @@ const pin = (color: string) =>
     iconAnchor: [11, 26],
   });
 
-// Türkçe ülke etiketleri
-const COUNTRIES: Array<{
-  name: string;
-  lat: number;
-  lng: number;
-}> = [
+// Türkçe ülke, bölge ve şehir isimleri
+const PLACES: PlaceLabel[] = [
+  // Avrupa
   { name: 'Türkiye', lat: 39, lng: 35 },
   { name: 'Rusya', lat: 61, lng: 95 },
   { name: 'Almanya', lat: 51, lng: 10 },
@@ -72,6 +78,8 @@ const COUNTRIES: Array<{
   { name: 'Bosna-Hersek', lat: 44.1, lng: 17.7 },
   { name: 'Arnavutluk', lat: 41.1, lng: 20 },
   { name: 'Kuzey Makedonya', lat: 41.6, lng: 21.7 },
+
+  // Asya ve Orta Doğu
   { name: 'Gürcistan', lat: 42.2, lng: 43.5 },
   { name: 'Ermenistan', lat: 40.2, lng: 44.9 },
   { name: 'Azerbaycan', lat: 40.3, lng: 47.5 },
@@ -81,15 +89,6 @@ const COUNTRIES: Array<{
   { name: 'İsrail', lat: 31.5, lng: 35 },
   { name: 'Suudi Arabistan', lat: 24, lng: 45 },
   { name: 'Birleşik Arap Emirlikleri', lat: 24, lng: 54 },
-  { name: 'Mısır', lat: 26.5, lng: 30 },
-  { name: 'Libya', lat: 27, lng: 17 },
-  { name: 'Cezayir', lat: 28, lng: 3 },
-  { name: 'Fas', lat: 32, lng: -6 },
-  { name: 'Tunus', lat: 34, lng: 9 },
-  { name: 'Nijerya', lat: 9, lng: 8 },
-  { name: 'Güney Afrika', lat: -29, lng: 25 },
-  { name: 'Etiyopya', lat: 9, lng: 40 },
-  { name: 'Kenya', lat: 0.5, lng: 37.8 },
   { name: 'Çin', lat: 35, lng: 104 },
   { name: 'Japonya', lat: 37, lng: 138 },
   { name: 'Güney Kore', lat: 36, lng: 128 },
@@ -105,8 +104,23 @@ const COUNTRIES: Array<{
   { name: 'Endonezya', lat: -2, lng: 118 },
   { name: 'Malezya', lat: 4, lng: 102 },
   { name: 'Filipinler', lat: 12.5, lng: 122 },
+
+  // Afrika
+  { name: 'Mısır', lat: 26.5, lng: 30 },
+  { name: 'Libya', lat: 27, lng: 17 },
+  { name: 'Cezayir', lat: 28, lng: 3 },
+  { name: 'Fas', lat: 32, lng: -6 },
+  { name: 'Tunus', lat: 34, lng: 9 },
+  { name: 'Nijerya', lat: 9, lng: 8 },
+  { name: 'Güney Afrika', lat: -29, lng: 25 },
+  { name: 'Etiyopya', lat: 9, lng: 40 },
+  { name: 'Kenya', lat: 0.5, lng: 37.8 },
+
+  // Okyanusya
   { name: 'Avustralya', lat: -25, lng: 134 },
   { name: 'Yeni Zelanda', lat: -41, lng: 173 },
+
+  // Amerika
   { name: 'Amerika Birleşik Devletleri', lat: 39, lng: -99 },
   { name: 'Kanada', lat: 57, lng: -106 },
   { name: 'Meksika', lat: 24, lng: -102 },
@@ -118,35 +132,110 @@ const COUNTRIES: Array<{
   { name: 'Venezuela', lat: 7, lng: -66 },
   { name: 'Bolivya', lat: -17, lng: -65 },
   { name: 'Uruguay', lat: -33, lng: -56 },
+
+  // Çin - şehirler
+  { name: 'Pekin', lat: 39.9042, lng: 116.4074, type: 'city', minZoom: 5 },
+  { name: 'Şanghay', lat: 31.2304, lng: 121.4737, type: 'city', minZoom: 5 },
+  { name: 'Guangzhou', lat: 23.1291, lng: 113.2644, type: 'city', minZoom: 6 },
+  { name: 'Şenzen', lat: 22.5431, lng: 114.0579, type: 'city', minZoom: 7 },
+  { name: 'Çengdu', lat: 30.5728, lng: 104.0668, type: 'city', minZoom: 6 },
+  { name: 'Çongçing', lat: 29.563, lng: 106.5516, type: 'city', minZoom: 6 },
+  { name: 'Vuhan', lat: 30.5928, lng: 114.3055, type: 'city', minZoom: 6 },
+  { name: 'Nankin', lat: 32.0603, lng: 118.7969, type: 'city', minZoom: 7 },
+  { name: 'Hangzhou', lat: 30.2741, lng: 120.1551, type: 'city', minZoom: 7 },
+  { name: 'Şian', lat: 34.3416, lng: 108.9398, type: 'city', minZoom: 6 },
+  { name: 'Harbin', lat: 45.8038, lng: 126.5349, type: 'city', minZoom: 6 },
+  { name: 'Urumçi', lat: 43.8256, lng: 87.6168, type: 'city', minZoom: 6 },
+  { name: 'Lhasa', lat: 29.652, lng: 91.1721, type: 'city', minZoom: 6 },
+  { name: 'Kunming', lat: 25.0389, lng: 102.7183, type: 'city', minZoom: 7 },
+  { name: 'Tientsin', lat: 39.3434, lng: 117.3616, type: 'city', minZoom: 7 },
+  { name: 'Çingdao', lat: 36.0671, lng: 120.3826, type: 'city', minZoom: 7 },
+
+  // Çin - bölgeler
+  { name: 'Sincan Uygur Özerk Bölgesi', lat: 41.5, lng: 85, type: 'region', minZoom: 4, maxZoom: 7 },
+  { name: 'Tibet Özerk Bölgesi', lat: 31.7, lng: 88.8, type: 'region', minZoom: 4, maxZoom: 7 },
+  { name: 'İç Moğolistan', lat: 43.5, lng: 112, type: 'region', minZoom: 4, maxZoom: 7 },
+  { name: 'Mançurya', lat: 46, lng: 124, type: 'region', minZoom: 4, maxZoom: 7 },
+  { name: 'Sıçuan', lat: 30, lng: 102.5, type: 'region', minZoom: 5, maxZoom: 8 },
+  { name: 'Yünnan', lat: 25, lng: 101.5, type: 'region', minZoom: 5, maxZoom: 8 },
+  { name: 'Guangdong', lat: 23.4, lng: 113.4, type: 'region', minZoom: 5, maxZoom: 8 },
+  { name: 'Hunan', lat: 27.5, lng: 111.7, type: 'region', minZoom: 5, maxZoom: 8 },
+  { name: 'Hubey', lat: 31, lng: 112.3, type: 'region', minZoom: 5, maxZoom: 8 },
+  { name: 'Şantung', lat: 36.4, lng: 118.4, type: 'region', minZoom: 5, maxZoom: 8 },
+
+  // Japonya - şehirler
+  { name: 'Tokyo', lat: 35.6762, lng: 139.6503, type: 'city', minZoom: 5 },
+  { name: 'Osaka', lat: 34.6937, lng: 135.5023, type: 'city', minZoom: 6 },
+  { name: 'Kyoto', lat: 35.0116, lng: 135.7681, type: 'city', minZoom: 7 },
+  { name: 'Nagoya', lat: 35.1815, lng: 136.9066, type: 'city', minZoom: 7 },
+  { name: 'Sapporo', lat: 43.0618, lng: 141.3545, type: 'city', minZoom: 6 },
+  { name: 'Fukuoka', lat: 33.5904, lng: 130.4017, type: 'city', minZoom: 6 },
+
+  // Rusya - şehirler
+  { name: 'Moskova', lat: 55.7558, lng: 37.6173, type: 'city', minZoom: 4 },
+  { name: 'St. Petersburg', lat: 59.9343, lng: 30.3351, type: 'city', minZoom: 5 },
+  { name: 'Kazan', lat: 55.7961, lng: 49.1064, type: 'city', minZoom: 6 },
+  { name: 'Novosibirsk', lat: 55.0084, lng: 82.9357, type: 'city', minZoom: 5 },
+  { name: 'Yekaterinburg', lat: 56.8389, lng: 60.6057, type: 'city', minZoom: 5 },
+  { name: 'Vladivostok', lat: 43.1155, lng: 131.8855, type: 'city', minZoom: 6 },
+  { name: 'Soçi', lat: 43.5855, lng: 39.7231, type: 'city', minZoom: 7 },
+
+  // Diğer önemli şehirler
+  { name: 'İstanbul', lat: 41.0082, lng: 28.9784, type: 'city', minZoom: 5 },
+  { name: 'Ankara', lat: 39.9334, lng: 32.8597, type: 'city', minZoom: 5 },
+  { name: 'İzmir', lat: 38.4237, lng: 27.1428, type: 'city', minZoom: 6 },
+  { name: 'Antalya', lat: 36.8969, lng: 30.7133, type: 'city', minZoom: 6 },
+  { name: 'Londra', lat: 51.5072, lng: -0.1276, type: 'city', minZoom: 5 },
+  { name: 'Paris', lat: 48.8566, lng: 2.3522, type: 'city', minZoom: 5 },
+  { name: 'Berlin', lat: 52.52, lng: 13.405, type: 'city', minZoom: 5 },
+  { name: 'Roma', lat: 41.9028, lng: 12.4964, type: 'city', minZoom: 5 },
+  { name: 'Atina', lat: 37.9838, lng: 23.7275, type: 'city', minZoom: 6 },
+  { name: 'Kahire', lat: 30.0444, lng: 31.2357, type: 'city', minZoom: 5 },
+  { name: 'Yeni Delhi', lat: 28.6139, lng: 77.209, type: 'city', minZoom: 5 },
+  { name: 'Seul', lat: 37.5665, lng: 126.978, type: 'city', minZoom: 5 },
+  { name: 'New York', lat: 40.7128, lng: -74.006, type: 'city', minZoom: 5 },
+  { name: 'Los Angeles', lat: 34.0522, lng: -118.2437, type: 'city', minZoom: 5 },
 ];
 
-// Harita üstünde Türkçe ülke isimleri
+// Türkçe etiket ikonu
+function labelIcon(place: PlaceLabel) {
+  const isCountry = !place.type || place.type === 'country';
+  const isRegion = place.type === 'region';
+
+  const fontSize = isCountry ? 12 : isRegion ? 11 : 10;
+  const fontWeight = isCountry ? 800 : isRegion ? 700 : 600;
+  const color = isCountry ? '#172033' : isRegion ? '#334155' : '#1e40af';
+
+  return L.divIcon({
+    className: 'hagy-turkish-label',
+    html: `<div style="
+      font-family:Arial,sans-serif;
+      font-size:${fontSize}px;
+      font-weight:${fontWeight};
+      color:${color};
+      text-shadow:
+        1px 1px 2px white,
+        -1px -1px 2px white,
+        0 0 4px white;
+      white-space:nowrap;
+      text-align:center;
+      pointer-events:none;
+      transform:translateX(-50%);
+    ">${place.name}</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
+// Yakınlaştırma seviyesine göre etiketleri göster
 function TurkishLabels() {
   const map = useMap();
 
   const labels = useMemo(
     () =>
-      COUNTRIES.map((country) => ({
-        ...country,
-        icon: L.divIcon({
-          className: '',
-          html: `<div style="
-            font-family:Arial,sans-serif;
-            font-size:11px;
-            font-weight:700;
-            color:#172033;
-            text-shadow:
-              1px 1px 2px white,
-              -1px -1px 2px white,
-              0 0 4px white;
-            white-space:nowrap;
-            text-align:center;
-            pointer-events:none;
-            transform:translateX(-50%);
-          ">${country.name}</div>`,
-          iconSize: [0, 0],
-          iconAnchor: [0, 0],
-        }),
+      PLACES.map((place) => ({
+        ...place,
+        icon: labelIcon(place),
       })),
     []
   );
@@ -154,17 +243,38 @@ function TurkishLabels() {
   useEffect(() => {
     const layer = L.layerGroup();
 
-    for (const country of labels) {
-      L.marker([country.lat, country.lng], {
-        icon: country.icon,
-        interactive: false,
-        keyboard: false,
-      }).addTo(layer);
-    }
+    const update = () => {
+      layer.clearLayers();
+
+      const zoom = map.getZoom();
+      const bounds = map.getBounds().pad(0.2);
+
+      for (const place of labels) {
+        const isCountry = !place.type || place.type === 'country';
+
+        // Yakınlaştırıldığında ülke isimlerini gizle
+        if (isCountry && zoom >= 6) continue;
+
+        if (zoom < (place.minZoom ?? 0)) continue;
+        if (zoom > (place.maxZoom ?? 19)) continue;
+
+        if (!bounds.contains([place.lat, place.lng])) continue;
+
+        L.marker([place.lat, place.lng], {
+          icon: place.icon,
+          interactive: false,
+          keyboard: false,
+        }).addTo(layer);
+      }
+    };
 
     layer.addTo(map);
+    update();
+
+    map.on('zoomend moveend', update);
 
     return () => {
+      map.off('zoomend moveend', update);
       map.removeLayer(layer);
     };
   }, [map, labels]);
@@ -172,6 +282,7 @@ function TurkishLabels() {
   return null;
 }
 
+// Haritaya tıklayarak tahmin yap
 function Clicks({
   onPick,
 }: {
@@ -193,6 +304,7 @@ function Clicks({
   return null;
 }
 
+// Harita boyutunu güncelle
 function SizeWatcher() {
   const map = useMap();
 
@@ -209,11 +321,8 @@ function SizeWatcher() {
   return null;
 }
 
-function Fit({
-  points,
-}: {
-  points: LatLng[];
-}) {
+// Sonuç ekranında konumları göster
+function Fit({ points }: { points: LatLng[] }) {
   const map = useMap();
 
   const key = points
@@ -232,8 +341,7 @@ function Fit({
     } else {
       const bounds = L.latLngBounds(
         points.map(
-          (p) =>
-            [p.lat, p.lng] as [number, number]
+          (p) => [p.lat, p.lng] as [number, number]
         )
       );
 
@@ -250,6 +358,7 @@ function Fit({
   return null;
 }
 
+// Ana harita bileşeni
 export default function MapPicker({
   guess,
   onPick,
@@ -350,14 +459,8 @@ export default function MapPicker({
           <Polyline
             key={`line-${index}`}
             positions={[
-              [
-                other.pos.lat,
-                other.pos.lng,
-              ],
-              [
-                actual.lat,
-                actual.lng,
-              ],
+              [other.pos.lat, other.pos.lng],
+              [actual.lat, actual.lng],
             ]}
             pathOptions={{
               color: other.color,
