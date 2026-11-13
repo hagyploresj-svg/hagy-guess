@@ -21,29 +21,43 @@ export default function Home() {
       </div>
 
       {/* Üst menü */}
-      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6">
-        <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-2xl">
+      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-5 sm:px-6 sm:py-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-xl sm:h-11 sm:w-11 sm:text-2xl">
             🌍
           </div>
 
-          <span className="text-xl font-black tracking-tight">
+          <span className="text-base font-black tracking-tight sm:text-xl">
             HAGY <span className="text-emerald-400">GUESS</span>
           </span>
         </Link>
 
-        <div className="flex items-center gap-3">
-          <span className="hidden rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 sm:inline-flex">
+        <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+          <span className="hidden rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 lg:inline-flex">
             ● ÜCRETSİZ OYNA
           </span>
 
           <Link
+            href="/login"
+            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-white/20 sm:px-5 sm:text-sm"
+          >
+            Giriş Yap
+          </Link>
+
+          <Link
+            href="/register"
+            className="rounded-xl bg-emerald-400 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-emerald-300 sm:px-5 sm:text-sm"
+          >
+            Kayıt Ol
+          </Link>
+
+          <Link
             href="/play"
-            className="rounded-xl border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-bold transition hover:bg-white/20"
+            className="hidden rounded-xl border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-bold transition hover:bg-white/20 md:inline-flex"
           >
             Oyuna Başla
           </Link>
-        </div>
+        </nav>
       </header>
 
       {/* Ana içerik */}
@@ -53,7 +67,7 @@ export default function Home() {
           DÜNYA SENİ BEKLİYOR
         </div>
 
-        {/* Dünya görseli */}
+        {/* Dünya animasyonu */}
         <div className="relative mb-4 flex h-52 w-52 items-center justify-center sm:h-64 sm:w-64">
           <div className="absolute inset-4 animate-pulse rounded-full bg-cyan-400/20 blur-3xl" />
 
@@ -105,9 +119,11 @@ export default function Home() {
           <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
             🌐 Dünya çapında keşif
           </span>
+
           <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
             🎯 Konum tahmini
           </span>
+
           <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
             ♾️ Sınırsız oyun
           </span>
@@ -264,6 +280,7 @@ export default function Home() {
             <span className="font-black text-slate-300">
               HAGY GUESS
             </span>
+
             <p className="mt-1">
               Dünyayı keşfet. Konumunu tahmin et.
             </p>
