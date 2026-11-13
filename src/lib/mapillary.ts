@@ -9,8 +9,9 @@ import type { LatLng, RoundImage } from './types';
 
 const BASE = 'https://graph.mapillary.com';
 
+// Yüksek kaliteli fotoğraf alanları
 const IMG_FIELDS =
-  'id,is_pano,captured_at,sequence,thumb_2048_url,geometry,computed_geometry,creator';
+  'id,is_pano,captured_at,sequence,thumb_2048_url,thumb_original_url,geometry,computed_geometry,creator';
 
 // Performans ayarları
 const MAX_CONCURRENT = 4;
@@ -18,7 +19,10 @@ const MAX_PICK_ATTEMPTS = 5;
 const PANO_ONLY_ATTEMPTS = 2;
 const SEED_JITTER_DEG = 0.3;
 const BBOX_HALF_DEG = 0.02;
+
+// İleri ve geri hareket mesafesi
 const MOVE_STEP = 4;
+
 const MIN_YEAR = 2014;
 
 const CACHE_TTL = 10 * 60 * 1000;
@@ -29,17 +33,30 @@ interface RawImage {
   is_pano?: boolean;
   captured_at?: number | string;
   sequence?: string;
+
+  // Fotoğraf çözünürlükleri
   thumb_2048_url?: string;
+  thumb_original_url?: string;
+
   geometry?: {
     coordinates: [number, number];
   };
+
   computed_geometry?: {
     coordinates: [number, number];
   };
+
   creator?: {
     username?: string;
     id?: string;
   };
+}
+
+interface ParsedImage {
+  image: RoundImage;
+  location: LatLng;
+  originalUrl: string | null;
+  fallbackUrl: string | null;
 }
 
 const sleep = (ms: number) =>
@@ -165,7 +182,10 @@ async function mly<T>(
       }
     }
 
-    throw new ApiError(502, 'Mapillary yanıt vermedi');
+    throw new ApiError(
+      502,
+      'Mapillary yanıt vermedi'
+    );
   } finally {
     release();
   }
@@ -174,7 +194,10 @@ async function mly<T>(
 // Bellek önbelleği
 const cache = new Map<
   string,
-  { value: unknown; expires: number }
+  {
+    value: unknown;
+    expires: number;
+  }
 >();
 
 function cacheGet<T>(key: string): T | undefined {
@@ -209,19 +232,21 @@ function cacheSet(
   });
 }
 
-// Tekrarlanan görüntü isteklerini birleştir
+// Aynı görüntü için tekrar eden istekleri birleştir
 const pendingImages = new Map<
   string,
   Promise<RoundImage>
 >();
 
-function parse(
-  raw: RawImage
-): { image: RoundImage; location: LatLng } | null {
+// Gelen fotoğraf verisini düzenle
+function parse(raw: RawImage): ParsedImage | null {
   const coordinates =
     (raw.computed_geometry ?? raw.geometry)?.coordinates;
 
-  if (!raw.thumb_2048_url || !coordinates) {
+  const originalUrl = raw.thumb_original_url ?? null;
+  const fallbackUrl = raw.thumb_2048_url ?? null;
+
+  if ((!originalUrl && !fallbackUrl) || !coordinates) {
     return null;
   }
 
@@ -239,7 +264,12 @@ function parse(
   let capturedAt: string | null = null;
 
   if (raw.captured_at) {
-    const date = new Date(raw.captured_at);
+    const value = raw.captured_at;
+
+    const date =
+      typeof value === 'number'
+        ? new Date(value)
+        : new Date(value);
 
     if (!Number.isNaN(date.getTime())) {
       capturedAt = date.toISOString();
@@ -251,26 +281,40 @@ function parse(
       imageId: raw.id,
       sequenceId: raw.sequence ?? null,
       isPano: raw.is_pano === true,
-      imageUrl: raw.thumb_2048_url,
+
+      // Orijinal kaliteyi tercih et
+      imageUrl: originalUrl ?? fallbackUrl ?? '',
+
       creator: raw.creator?.username ?? null,
       capturedAt,
     },
-    location: { lat, lng },
+
+    location: {
+      lat,
+      lng,
+    },
+
+    originalUrl,
+    fallbackUrl,
   };
 }
 
 // Fotoğraf bağlantısını kontrol et
-async function reachable(url: string): Promise<boolean> {
+async function reachable(
+  url: string,
+  timeoutMs = 1500
+): Promise<boolean> {
   const controller = new AbortController();
 
   const timer = setTimeout(() => {
     controller.abort();
-  }, 2000);
+  }, timeoutMs);
 
   try {
     const response = await fetch(url, {
       method: 'HEAD',
       signal: controller.signal,
+      cache: 'no-store',
     });
 
     return response.ok;
@@ -279,6 +323,51 @@ async function reachable(url: string): Promise<boolean> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Orijinal çözünürlük varsa kullan,
+// yoksa 2048 sürümüne dön
+async function selectBestQuality(
+  parsed: ParsedImage
+): Promise<RoundImage | null> {
+  const {
+    image,
+    originalUrl,
+    fallbackUrl,
+  } = parsed;
+
+  // Önce yüksek çözünürlük
+  if (originalUrl) {
+    const works = await reachable(originalUrl, 1500);
+
+    if (works) {
+      return {
+        ...image,
+        imageUrl: originalUrl,
+      };
+    }
+  }
+
+  // Yüksek kalite yoksa 2048 kullan
+  if (fallbackUrl) {
+    if (fallbackUrl === originalUrl) {
+      return {
+        ...image,
+        imageUrl: fallbackUrl,
+      };
+    }
+
+    const works = await reachable(fallbackUrl, 1500);
+
+    if (works) {
+      return {
+        ...image,
+        imageUrl: fallbackUrl,
+      };
+    }
+  }
+
+  return null;
 }
 
 // Rastgele konum seçimi
@@ -300,7 +389,9 @@ function pickSeedIndex(): number {
   for (let i = 0; i < weights.length; i++) {
     random -= weights[i];
 
-    if (random <= 0) return i;
+    if (random <= 0) {
+      return i;
+    }
   }
 
   return 0;
@@ -368,11 +459,8 @@ export async function pickRandomLocation(): Promise<{
     const candidates = rawImages
       .map(parse)
       .filter(
-        (
-          item
-        ): item is NonNullable<
-          ReturnType<typeof parse>
-        > => item !== null
+        (item): item is ParsedImage =>
+          item !== null
       )
       .filter(
         (item) =>
@@ -389,13 +477,19 @@ export async function pickRandomLocation(): Promise<{
       .slice(0, 2);
 
     for (const candidate of candidates) {
-      if (await reachable(candidate.image.imageUrl)) {
+      const bestImage =
+        await selectBestQuality(candidate);
+
+      if (bestImage) {
         cacheSet(
-          `img:${candidate.image.imageId}`,
-          candidate.image
+          `img:${bestImage.imageId}`,
+          bestImage
         );
 
-        return candidate;
+        return {
+          image: bestImage,
+          location: candidate.location,
+        };
       }
     }
 
@@ -420,16 +514,22 @@ export async function getImageById(
     `img:${id}`
   );
 
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
 
   const existing = pendingImages.get(id);
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
   const request = (async () => {
     const raw = await mly<RawImage>(
       `/${encodeURIComponent(id)}`,
-      { fields: IMG_FIELDS }
+      {
+        fields: IMG_FIELDS,
+      }
     );
 
     const parsed = parse(raw);
@@ -441,9 +541,22 @@ export async function getImageById(
       );
     }
 
-    cacheSet(`img:${id}`, parsed.image);
+    const bestImage =
+      await selectBestQuality(parsed);
 
-    return parsed.image;
+    if (!bestImage) {
+      throw new ApiError(
+        502,
+        'Fotoğraf bağlantısı kullanılamıyor'
+      );
+    }
+
+    cacheSet(
+      `img:${id}`,
+      bestImage
+    );
+
+    return bestImage;
   })();
 
   pendingImages.set(id, request);
@@ -466,17 +579,26 @@ async function sequenceIds(
 ): Promise<string[]> {
   const cacheKey = `seq:${sequenceId}`;
 
-  const cached = cacheGet<string[]>(cacheKey);
+  const cached = cacheGet<string[]>(
+    cacheKey
+  );
 
-  if (cached) return cached;
+  if (cached) {
+    return cached;
+  }
 
-  const existing = pendingSequences.get(sequenceId);
+  const existing =
+    pendingSequences.get(sequenceId);
 
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
 
   const request = (async () => {
     const response = await mly<{
-      data?: { id: string }[];
+      data?: {
+        id: string;
+      }[];
     }>('/image_ids', {
       sequence_id: sequenceId,
     });
@@ -506,6 +628,7 @@ export async function moveAlong(
   direction: 'next' | 'prev'
 ): Promise<RoundImage> {
   const ids = await sequenceIds(sequenceId);
+
   const index = ids.indexOf(imageId);
 
   if (index < 0) {
