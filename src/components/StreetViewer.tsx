@@ -6,62 +6,60 @@ import type { Viewer } from '@photo-sphere-viewer/core';
 import '@photo-sphere-viewer/core/index.css';
 import type { RoundImage } from '@/lib/types';
 
-interface Props {
+const TRANSITION_MS = 500;
+
+export default function StreetViewer({
+  image,
+}: {
   image: RoundImage;
-}
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewerRef = useRef<Viewer | null>(null);
+  const latestImageRef = useRef(image);
+  latestImageRef.current = image;
 
-const TRANSITION_MS = 550;
-
-export default function StreetViewer({ image }: Props) {
-  const box = useRef<HTMLDivElement>(null);
-  const viewer = useRef<Viewer | null>(null);
-
-  const latestImage = useRef(image);
-  latestImage.current = image;
-
-  const previousUrl = useRef(image.imageUrl);
-
-  const [flatPrevious, setFlatPrevious] = useState<
+  const [previousPhoto, setPreviousPhoto] = useState<
     string | null
   >(null);
 
-  const [flatTransition, setFlatTransition] =
-    useState(false);
+  const [animating, setAnimating] = useState(false);
+  const previousUrlRef = useRef(image.imageUrl);
 
-  const transitionId = useRef(0);
-
-  // 360 derece panorama görüntüleyicisini oluştur
+  // 360 derece görüntüleyiciyi başlat
   useEffect(() => {
-    if (!image.isPano || !box.current) return;
+    if (!image.isPano || !containerRef.current) {
+      return;
+    }
 
     let cancelled = false;
-    let instance: Viewer | null = null;
+    let localViewer: Viewer | null = null;
 
     import('@photo-sphere-viewer/core')
       .then(({ Viewer }) => {
-        if (cancelled || !box.current) return;
+        if (cancelled || !containerRef.current) {
+          return;
+        }
 
-        const firstUrl = latestImage.current.imageUrl;
+        const initialUrl = latestImageRef.current.imageUrl;
 
-        instance = new Viewer({
-          container: box.current,
-          panorama: firstUrl,
+        localViewer = new Viewer({
+          container: containerRef.current,
+          panorama: initialUrl,
           navbar: ['zoom', 'fullscreen'],
           defaultZoomLvl: 25,
           mousewheelCtrlKey: false,
           loadingTxt: 'Panorama yükleniyor…',
         });
 
-        viewer.current = instance;
+        viewerRef.current = localViewer;
 
-        const newestUrl = latestImage.current.imageUrl;
+        // Başlatma sırasında fotoğraf değişmişse güncelle
+        const newestUrl = latestImageRef.current.imageUrl;
 
-        if (newestUrl !== firstUrl) {
-          void instance
+        if (newestUrl !== initialUrl) {
+          void localViewer
             .setPanorama(newestUrl, {
-              transition: {
-                duration: TRANSITION_MS,
-              },
+              transition: true,
               showLoader: false,
             })
             .catch(() => {});
@@ -72,74 +70,65 @@ export default function StreetViewer({ image }: Props) {
     return () => {
       cancelled = true;
 
-      if (instance) {
-        instance.destroy();
+      if (localViewer) {
+        localViewer.destroy();
       }
 
-      if (viewer.current === instance) {
-        viewer.current = null;
+      if (viewerRef.current === localViewer) {
+        viewerRef.current = null;
       }
     };
   }, [image.isPano]);
 
-  // Yeni 360 derece görüntüye animasyonlu geç
+  // Panorama değiştiğinde yumuşak geçiş
   useEffect(() => {
     if (!image.isPano) return;
 
-    const instance = viewer.current;
+    const viewer = viewerRef.current;
 
-    if (!instance) return;
+    if (!viewer) return;
 
-    void instance
+    void viewer
       .setPanorama(image.imageUrl, {
-        transition: {
-          duration: TRANSITION_MS,
-        },
+        transition: true,
         showLoader: false,
       })
       .catch(() => {});
   }, [image.imageUrl, image.isPano]);
 
-  // Düz fotoğraflar için yumuşak geçiş
+  // Düz fotoğraf geçiş animasyonu
   useEffect(() => {
     if (image.isPano) {
-      previousUrl.current = image.imageUrl;
+      previousUrlRef.current = image.imageUrl;
       return;
     }
 
-    if (previousUrl.current === image.imageUrl) {
+    if (previousUrlRef.current === image.imageUrl) {
       return;
     }
 
-    const oldUrl = previousUrl.current;
-    previousUrl.current = image.imageUrl;
+    const oldPhoto = previousUrlRef.current;
+    previousUrlRef.current = image.imageUrl;
 
-    transitionId.current += 1;
-    const currentId = transitionId.current;
+    setPreviousPhoto(oldPhoto);
+    setAnimating(false);
 
-    setFlatPrevious(oldUrl);
-    setFlatTransition(false);
+    let secondFrame = 0;
 
-    let frame2 = 0;
-
-    const frame1 = requestAnimationFrame(() => {
-      frame2 = requestAnimationFrame(() => {
-        if (currentId === transitionId.current) {
-          setFlatTransition(true);
-        }
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        setAnimating(true);
       });
     });
 
     const timer = setTimeout(() => {
-      if (currentId === transitionId.current) {
-        setFlatPrevious(null);
-        setFlatTransition(false);
-      }
-    }, TRANSITION_MS + 80);
+      setPreviousPhoto(null);
+      setAnimating(false);
+    }, TRANSITION_MS + 100);
 
     return () => {
-      cancelAnimationFrame(frame1);
-      cancelAnimationFrame(frame2);
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
       clearTimeout(timer);
     };
   }, [image.imageUrl, image.isPano]);
@@ -147,7 +136,7 @@ export default function StreetViewer({ image }: Props) {
   if (image.isPano) {
     return (
       <div
-        ref={box}
+        ref={containerRef}
         className="h-full w-full bg-black"
       />
     );
@@ -155,7 +144,7 @@ export default function StreetViewer({ image }: Props) {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {/* Yeni fotoğraf */}
+      {/* Yeni sokak fotoğrafı */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={image.imageUrl}
@@ -165,25 +154,23 @@ export default function StreetViewer({ image }: Props) {
         className="absolute inset-0 h-full w-full select-none object-contain"
       />
 
-      {/* Eski fotoğraf yumuşak şekilde kaybolur */}
-      {flatPrevious && (
+      {/* Eski fotoğrafın yumuşak geçişi */}
+      {previousPhoto && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={flatPrevious}
+            src={previousPhoto}
             alt=""
             draggable={false}
             referrerPolicy="no-referrer"
             className="pointer-events-none absolute inset-0 h-full w-full select-none object-contain"
             style={{
-              opacity: flatTransition ? 0 : 1,
-              transform: flatTransition
-                ? 'scale(1.12)'
+              opacity: animating ? 0 : 1,
+              transform: animating
+                ? 'scale(1.1)'
                 : 'scale(1)',
-              transition: `
-                opacity ${TRANSITION_MS}ms ease-in-out,
-                transform ${TRANSITION_MS}ms ease-in-out
-              `,
+              transition:
+                'opacity 500ms ease-in-out, transform 500ms ease-in-out',
             }}
           />
         </>
