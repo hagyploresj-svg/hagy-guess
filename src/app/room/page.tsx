@@ -7,6 +7,12 @@ import { useState } from 'react';
 import { api } from '@/lib/api-client';
 import { credsKey } from '@/hooks/useRoom';
 
+type CreateRoomResponse = {
+  code: string;
+  playerId: string;
+  secret: string;
+};
+
 export default function RoomEntry() {
   const router = useRouter();
 
@@ -23,51 +29,58 @@ export default function RoomEntry() {
     setErr(null);
 
     try {
-      const r = await api<{
-        code: string;
-        playerId: string;
-        secret: string;
-      }>('/api/rooms', {
-        method: 'POST',
-        body: {
-          nickname: nick.trim(),
-          totalRounds: rounds,
-          timeLimitSec: 0,
-        },
-      });
+      const result = await api<CreateRoomResponse>(
+        '/api/rooms',
+        {
+          method: 'POST',
+          body: {
+            nickname: nick.trim(),
+            totalRounds: rounds,
+
+            // Geçici test değeri.
+            // Sunucu süresiz modu destekleyince 0 yapılacak.
+            timeLimitSec: 120,
+          },
+        }
+      );
 
       localStorage.setItem(
-        credsKey(r.code),
+        credsKey(result.code),
         JSON.stringify({
-          playerId: r.playerId,
-          secret: r.secret,
+          playerId: result.playerId,
+          secret: result.secret,
         })
       );
 
-      router.push(`/room/${r.code}`);
-    } catch (e) {
+      router.push(`/room/${result.code}`);
+    } catch (error) {
+      console.error('Oda oluşturma hatası:', error);
+
       setErr(
-        e instanceof Error
-          ? e.message
-          : 'Oda oluşturulamadı. Tekrar dene.'
+        error instanceof Error
+          ? error.message
+          : 'Sunucu hatası. Tekrar dene.'
       );
+
       setBusy(false);
     }
   };
 
   const join = () => {
     const roomCode = code.trim().toUpperCase();
+
     if (roomCode.length !== 5) return;
 
     router.push(`/room/${roomCode}`);
   };
 
   const field =
-    'w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-emerald-400';
+    'w-full rounded-xl border border-slate-700 ' +
+    'bg-slate-900 px-4 py-3 text-white ' +
+    'outline-none transition focus:border-emerald-400';
 
   return (
     <main className="relative min-h-dvh overflow-hidden bg-[#070d1b] px-5 py-10 text-white">
-
       {/* Arka plan */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-32 top-20 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
@@ -75,8 +88,6 @@ export default function RoomEntry() {
       </div>
 
       <div className="relative mx-auto flex w-full max-w-lg flex-col gap-7">
-
-        {/* Üst alan */}
         <Link
           href="/"
           className="w-fit text-sm text-slate-400 transition hover:text-white"
@@ -84,21 +95,25 @@ export default function RoomEntry() {
           ← Ana sayfaya dön
         </Link>
 
+        {/* Başlık */}
         <div className="text-center">
           <div className="mb-4 text-6xl">⚔️</div>
 
           <h1 className="text-4xl font-black">
-            ÇOK <span className="text-violet-400">OYUNCULU</span>
+            ÇOK{' '}
+            <span className="text-violet-400">
+              OYUNCULU
+            </span>
           </h1>
 
           <p className="mt-3 text-sm text-slate-400">
-            Arkadaşlarınla dünyayı keşfet, en iyi tahmini yap ve kazan!
+            Arkadaşlarınla dünyayı keşfet,
+            en iyi tahmini yap ve kazan!
           </p>
         </div>
 
-        {/* Oda oluştur */}
+        {/* Oda oluşturma */}
         <section className="space-y-5 rounded-3xl border border-emerald-400/20 bg-slate-900/70 p-6 shadow-2xl">
-
           <div>
             <h2 className="text-xl font-black">
               🌍 ODA OLUŞTUR
@@ -123,7 +138,9 @@ export default function RoomEntry() {
               placeholder="Takma adını yaz"
               maxLength={20}
               value={nick}
-              onChange={(e) => setNick(e.target.value)}
+              onChange={(event) =>
+                setNick(event.target.value)
+              }
             />
           </div>
 
@@ -139,7 +156,9 @@ export default function RoomEntry() {
               id="rounds"
               className={field}
               value={rounds}
-              onChange={(e) => setRounds(Number(e.target.value))}
+              onChange={(event) =>
+                setRounds(Number(event.target.value))
+              }
             >
               {[3, 5, 8, 10].map((n) => (
                 <option key={n} value={n}>
@@ -149,17 +168,17 @@ export default function RoomEntry() {
             </select>
           </div>
 
-          {/* Süre sınırı yok */}
           <div className="flex items-center gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4">
             <span className="text-2xl">♾️</span>
 
             <div>
               <p className="text-sm font-bold text-emerald-300">
-                Süresiz oyun
+                Süresiz oyun hedefi
               </p>
 
               <p className="text-xs text-slate-400">
-                Acele etmeden keşfet ve tahminini yap.
+                Şu anda sunucu uyumluluğunu test ediyoruz.
+                Süresiz modu sonraki adımda etkinleştireceğiz.
               </p>
             </div>
           </div>
@@ -170,13 +189,14 @@ export default function RoomEntry() {
             onClick={create}
             className="w-full rounded-xl bg-emerald-400 py-4 font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? 'ODA OLUŞTURULUYOR...' : '🚀 ODA OLUŞTUR'}
+            {busy
+              ? 'ODA OLUŞTURULUYOR...'
+              : '🚀 ODA OLUŞTUR'}
           </button>
         </section>
 
-        {/* Odaya katıl */}
+        {/* Odaya katılma */}
         <section className="space-y-5 rounded-3xl border border-violet-400/20 bg-slate-900/70 p-6 shadow-2xl">
-
           <div>
             <h2 className="text-xl font-black">
               🔑 ODAYA KATIL
@@ -193,8 +213,8 @@ export default function RoomEntry() {
             placeholder="ODA KODU"
             maxLength={5}
             value={code}
-            onChange={(e) =>
-              setCode(e.target.value.toUpperCase())
+            onChange={(event) =>
+              setCode(event.target.value.toUpperCase())
             }
           />
 
