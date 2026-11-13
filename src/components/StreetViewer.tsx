@@ -15,106 +15,132 @@ const TRANSITION_MS = 550;
 export default function StreetViewer({ image }: Props) {
   const box = useRef<HTMLDivElement>(null);
   const viewer = useRef<Viewer | null>(null);
-  const initialUrl = useRef(image.imageUrl);
+
+  const latestImage = useRef(image);
+  latestImage.current = image;
+
   const previousUrl = useRef(image.imageUrl);
 
-  const [flatPrevious, setFlatPrevious] = useState<string | null>(null);
-  const [flatTransition, setFlatTransition] = useState(false);
+  const [flatPrevious, setFlatPrevious] = useState<
+    string | null
+  >(null);
 
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [flatTransition, setFlatTransition] =
+    useState(false);
+
   const transitionId = useRef(0);
 
-  // 360 derece görüntüleyiciyi oluştur
+  // 360 derece panorama görüntüleyicisini oluştur
   useEffect(() => {
     if (!image.isPano || !box.current) return;
 
     let cancelled = false;
+    let instance: Viewer | null = null;
 
-    import('@photo-sphere-viewer/core').then(({ Viewer }) => {
-      if (cancelled || !box.current) return;
+    import('@photo-sphere-viewer/core')
+      .then(({ Viewer }) => {
+        if (cancelled || !box.current) return;
 
-      const instance = new Viewer({
-        container: box.current,
-        panorama: initialUrl.current,
-        navbar: ['zoom', 'fullscreen'],
-        defaultZoomLvl: 25,
-        mousewheelCtrlKey: false,
-        loadingTxt: 'Panorama yükleniyor…',
-      });
+        const firstUrl = latestImage.current.imageUrl;
 
-      viewer.current = instance;
+        instance = new Viewer({
+          container: box.current,
+          panorama: firstUrl,
+          navbar: ['zoom', 'fullscreen'],
+          defaultZoomLvl: 25,
+          mousewheelCtrlKey: false,
+          loadingTxt: 'Panorama yükleniyor…',
+        });
 
-      // İlk yükleme sırasında görüntü değişmişse
-      if (initialUrl.current !== image.imageUrl) {
-        void instance.setPanorama(image.imageUrl, {
-          transition: 550,
-          showLoader: false,
-        }).catch(() => {});
-      }
-    }).catch(() => {});
+        viewer.current = instance;
+
+        const newestUrl = latestImage.current.imageUrl;
+
+        if (newestUrl !== firstUrl) {
+          void instance
+            .setPanorama(newestUrl, {
+              transition: {
+                duration: TRANSITION_MS,
+              },
+              showLoader: false,
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
-      viewer.current?.destroy();
-      viewer.current = null;
+
+      if (instance) {
+        instance.destroy();
+      }
+
+      if (viewer.current === instance) {
+        viewer.current = null;
+      }
     };
   }, [image.isPano]);
 
-  // 360 derece fotoğraflar arasında yumuşak geçiş
+  // Yeni 360 derece görüntüye animasyonlu geç
   useEffect(() => {
     if (!image.isPano) return;
 
     const instance = viewer.current;
+
     if (!instance) return;
 
-    void instance.setPanorama(image.imageUrl, {
-      transition: TRANSITION_MS,
-      showLoader: false,
-    }).catch(() => {});
+    void instance
+      .setPanorama(image.imageUrl, {
+        transition: {
+          duration: TRANSITION_MS,
+        },
+        showLoader: false,
+      })
+      .catch(() => {});
   }, [image.imageUrl, image.isPano]);
 
-  // Düz fotoğraflar için animasyon
+  // Düz fotoğraflar için yumuşak geçiş
   useEffect(() => {
     if (image.isPano) {
       previousUrl.current = image.imageUrl;
       return;
     }
 
-    if (previousUrl.current === image.imageUrl) return;
+    if (previousUrl.current === image.imageUrl) {
+      return;
+    }
 
     const oldUrl = previousUrl.current;
     previousUrl.current = image.imageUrl;
 
     transitionId.current += 1;
-    const id = transitionId.current;
-
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
+    const currentId = transitionId.current;
 
     setFlatPrevious(oldUrl);
     setFlatTransition(false);
 
-    const frame = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (id === transitionId.current) {
+    let frame2 = 0;
+
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => {
+        if (currentId === transitionId.current) {
           setFlatTransition(true);
         }
       });
     });
 
-    timerRef.current = setTimeout(() => {
-      if (id === transitionId.current) {
+    const timer = setTimeout(() => {
+      if (currentId === transitionId.current) {
         setFlatPrevious(null);
         setFlatTransition(false);
       }
     }, TRANSITION_MS + 80);
 
     return () => {
-      cancelAnimationFrame(frame);
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
+      cancelAnimationFrame(frame1);
+      cancelAnimationFrame(frame2);
+      clearTimeout(timer);
     };
   }, [image.imageUrl, image.isPano]);
 
@@ -139,7 +165,7 @@ export default function StreetViewer({ image }: Props) {
         className="absolute inset-0 h-full w-full select-none object-contain"
       />
 
-      {/* Önceki fotoğrafın animasyonlu kaybolması */}
+      {/* Eski fotoğraf yumuşak şekilde kaybolur */}
       {flatPrevious && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -154,7 +180,10 @@ export default function StreetViewer({ image }: Props) {
               transform: flatTransition
                 ? 'scale(1.12)'
                 : 'scale(1)',
-              transition: `opacity ${TRANSITION_MS}ms ease-in-out, transform ${TRANSITION_MS}ms ease-in-out`,
+              transition: `
+                opacity ${TRANSITION_MS}ms ease-in-out,
+                transform ${TRANSITION_MS}ms ease-in-out
+              `,
             }}
           />
         </>
