@@ -1,5 +1,6 @@
 
 import 'server-only';
+
 import { env } from './env';
 import { ApiError } from './http';
 import { SEEDS } from './locations';
@@ -11,9 +12,10 @@ const BASE = 'https://graph.mapillary.com';
 const IMG_FIELDS =
   'id,is_pano,captured_at,sequence,thumb_2048_url,geometry,computed_geometry,creator';
 
+// Genel ayarlar
 const MAX_CONCURRENT = 4;
-const MAX_PICK_ATTEMPTS = 10;
-const PANO_ONLY_ATTEMPTS = 7;
+const MAX_PICK_ATTEMPTS = 25;
+const PANO_ONLY_ATTEMPTS = 10;
 const SEED_JITTER_DEG = 0.3;
 const BBOX_HALF_DEG = 0.02;
 const MOVE_STEP = 4;
@@ -28,8 +30,12 @@ interface RawImage {
   captured_at?: number | string;
   sequence?: string;
   thumb_2048_url?: string;
-  geometry?: { coordinates: [number, number] };
-  computed_geometry?: { coordinates: [number, number] };
+  geometry?: {
+    coordinates: [number, number];
+  };
+  computed_geometry?: {
+    coordinates: [number, number];
+  };
   creator?: {
     username?: string;
     id?: string;
@@ -39,6 +45,7 @@ interface RawImage {
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+// API eşzamanlılık kontrolü
 let active = 0;
 const waiters: Array<() => void> = [];
 
@@ -60,6 +67,7 @@ function release() {
   waiters.shift()?.();
 }
 
+// API yoğunluk koruması
 let blockedUntil = 0;
 
 function busy(seconds: number) {
@@ -70,7 +78,7 @@ function busy(seconds: number) {
   );
 }
 
-// Mapillary API istekleri
+// Mapillary API bağlantısı
 async function mly<T>(
   path: string,
   params: Record<string, string | number | boolean>
@@ -114,7 +122,8 @@ async function mly<T>(
           const retryAfter =
             Number(response.headers.get('retry-after')) || 10;
 
-          blockedUntil = Date.now() + retryAfter * 1000;
+          blockedUntil =
+            Date.now() + retryAfter * 1000;
 
           throw busy(retryAfter);
         }
@@ -129,11 +138,9 @@ async function mly<T>(
           );
         }
 
-        if (response.status >= 500) {
-          if (attempt < 2) {
-            await sleep(300 * 2 ** attempt);
-            continue;
-          }
+        if (response.status >= 500 && attempt < 2) {
+          await sleep(300 * 2 ** attempt);
+          continue;
         }
 
         throw new ApiError(
@@ -158,7 +165,10 @@ async function mly<T>(
       }
     }
 
-    throw new ApiError(502, 'Mapillary yanıt vermedi');
+    throw new ApiError(
+      502,
+      'Mapillary yanıt vermedi'
+    );
   } finally {
     release();
   }
@@ -191,7 +201,9 @@ function cacheSet(
   if (cache.size >= MAX_CACHE_SIZE) {
     const oldest = cache.keys().next().value;
 
-    if (oldest) cache.delete(oldest);
+    if (oldest !== undefined) {
+      cache.delete(oldest);
+    }
   }
 
   cache.set(key, {
@@ -200,7 +212,7 @@ function cacheSet(
   });
 }
 
-// Aynı görüntü için eşzamanlı API isteklerini birleştir
+// Aynı görüntü için tekrar eden istekleri birleştir
 const pendingImages = new Map<
   string,
   Promise<RoundImage>
@@ -227,6 +239,16 @@ function parse(
     return null;
   }
 
+  let capturedAt: string | null = null;
+
+  if (raw.captured_at) {
+    const date = new Date(raw.captured_at);
+
+    if (!Number.isNaN(date.getTime())) {
+      capturedAt = date.toISOString();
+    }
+  }
+
   return {
     image: {
       imageId: raw.id,
@@ -234,21 +256,19 @@ function parse(
       isPano: raw.is_pano === true,
       imageUrl: raw.thumb_2048_url,
       creator: raw.creator?.username ?? null,
-      capturedAt: raw.captured_at
-        ? new Date(raw.captured_at).toISOString()
-        : null,
+      capturedAt,
     },
     location: { lat, lng },
   };
 }
 
-// Görüntü bağlantısı erişilebilir mi?
+// Görüntü erişilebilirlik kontrolü
 async function reachable(url: string): Promise<boolean> {
   const controller = new AbortController();
 
   const timer = setTimeout(() => {
     controller.abort();
-  }, 3000);
+  }, 4000);
 
   try {
     const response = await fetch(url, {
@@ -264,7 +284,7 @@ async function reachable(url: string): Promise<boolean> {
   }
 }
 
-// Rastgele bölge seçimi
+// Rastgele konum seçimi
 const seedFails = new Map<number, number>();
 
 function pickSeedIndex(): number {
@@ -283,18 +303,24 @@ function pickSeedIndex(): number {
   for (let i = 0; i < weights.length; i++) {
     random -= weights[i];
 
-    if (random <= 0) return i;
+    if (random <= 0) {
+      return i;
+    }
   }
 
   return 0;
 }
 
-// Rastgele sokak görüntüsü seç
+// Yeni oyun için rastgele sokak seç
 export async function pickRandomLocation(): Promise<{
   image: RoundImage;
   location: LatLng;
 }> {
-  for (let attempt = 0; attempt < MAX_PICK_ATTEMPTS; attempt++) {
+  for (
+    let attempt = 0;
+    attempt < MAX_PICK_ATTEMPTS;
+    attempt++
+  ) {
     const seedIndex = pickSeedIndex();
 
     const [, lat, lng] = SEEDS[seedIndex];
@@ -366,7 +392,7 @@ export async function pickRandomLocation(): Promise<{
           ).getUTCFullYear() >= MIN_YEAR
       )
       .sort(() => Math.random() - 0.5)
-      .slice(0, 3);
+      .slice(0, 5);
 
     for (const candidate of candidates) {
       if (
@@ -398,7 +424,9 @@ export async function pickRandomLocation(): Promise<{
 export async function getImageById(
   id: string
 ): Promise<RoundImage> {
-  const cached = cacheGet<RoundImage>(`img:${id}`);
+  const cached = cacheGet<RoundImage>(
+    `img:${id}`
+  );
 
   if (cached) return cached;
 
@@ -421,7 +449,10 @@ export async function getImageById(
       );
     }
 
-    cacheSet(`img:${id}`, parsed.image);
+    cacheSet(
+      `img:${id}`,
+      parsed.image
+    );
 
     return parsed.image;
   })();
@@ -435,7 +466,7 @@ export async function getImageById(
   }
 }
 
-// Sekans kimliklerini önbellekle
+// Sekans bilgilerini önbellekle
 const pendingSequences = new Map<
   string,
   Promise<string[]>
@@ -446,11 +477,15 @@ async function sequenceIds(
 ): Promise<string[]> {
   const cacheKey = `seq:${sequenceId}`;
 
-  const cached = cacheGet<string[]>(cacheKey);
+  const cached = cacheGet<string[]>(
+    cacheKey
+  );
 
   if (cached) return cached;
 
-  const existing = pendingSequences.get(sequenceId);
+  const existing = pendingSequences.get(
+    sequenceId
+  );
 
   if (existing) return existing;
 
@@ -470,7 +505,10 @@ async function sequenceIds(
     return ids;
   })();
 
-  pendingSequences.set(sequenceId, request);
+  pendingSequences.set(
+    sequenceId,
+    request
+  );
 
   try {
     return await request;
@@ -479,7 +517,7 @@ async function sequenceIds(
   }
 }
 
-// İleri ve geri hareket
+// İleri ve geri hareket: 4 kare atla
 export async function moveAlong(
   imageId: string,
   sequenceId: string,
@@ -512,5 +550,7 @@ export async function moveAlong(
     );
   }
 
-  return getImageById(ids[targetIndex]);
+  return getImageById(
+    ids[targetIndex]
+  );
 }
