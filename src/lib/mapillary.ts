@@ -14,7 +14,7 @@ const IMG_FIELDS =
   'id,is_pano,captured_at,sequence,thumb_2048_url,thumb_original_url,geometry,computed_geometry,creator';
 
 const MAX_CONCURRENT = 4;
-const REQUEST_TIMEOUT_MS = 5000;
+const REQUEST_TIMEOUT_MS = 15000;
 const MOVE_STEP = 3;
 const MIN_YEAR = 2014;
 
