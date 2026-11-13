@@ -1,4 +1,6 @@
+
 'use client';
+
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -7,55 +9,218 @@ import { credsKey } from '@/hooks/useRoom';
 
 export default function RoomEntry() {
   const router = useRouter();
+
   const [nick, setNick] = useState('');
   const [rounds, setRounds] = useState(5);
-  const [time, setTime] = useState(120);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const create = async () => {
-    setBusy(true); setErr(null);
+    if (!nick.trim() || busy) return;
+
+    setBusy(true);
+    setErr(null);
+
     try {
-      const r = await api<{ code: string; playerId: string; secret: string }>('/api/rooms', {
-        method: 'POST', body: { nickname: nick, totalRounds: rounds, timeLimitSec: time },
+      const r = await api<{
+        code: string;
+        playerId: string;
+        secret: string;
+      }>('/api/rooms', {
+        method: 'POST',
+        body: {
+          nickname: nick.trim(),
+          totalRounds: rounds,
+          timeLimitSec: 0,
+        },
       });
-      localStorage.setItem(credsKey(r.code), JSON.stringify({ playerId: r.playerId, secret: r.secret }));
+
+      localStorage.setItem(
+        credsKey(r.code),
+        JSON.stringify({
+          playerId: r.playerId,
+          secret: r.secret,
+        })
+      );
+
       router.push(`/room/${r.code}`);
-    } catch (e) { setErr((e as Error).message); setBusy(false); }
+    } catch (e) {
+      setErr(
+        e instanceof Error
+          ? e.message
+          : 'Oda oluşturulamadı. Tekrar dene.'
+      );
+      setBusy(false);
+    }
   };
 
-  const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 outline-none focus:border-brand';
+  const join = () => {
+    const roomCode = code.trim().toUpperCase();
+    if (roomCode.length !== 5) return;
+
+    router.push(`/room/${roomCode}`);
+  };
+
+  const field =
+    'w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white outline-none transition focus:border-emerald-400';
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 px-6 py-10">
-      <Link href="/" className="text-sm text-slate-400 hover:text-white">← Ana sayfa</Link>
-      <h1 className="text-3xl font-black">Çok Oyunculu</h1>
+    <main className="relative min-h-dvh overflow-hidden bg-[#070d1b] px-5 py-10 text-white">
 
-      <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-        <h2 className="font-bold">Oda kur</h2>
-        <input className={field} placeholder="Takma adın" maxLength={20} value={nick} onChange={(e) => setNick(e.target.value)} />
-        <div className="grid grid-cols-2 gap-3">
-          <select className={field} value={rounds} onChange={(e) => setRounds(+e.target.value)}>
-            {[3, 5, 8, 10].map((n) => <option key={n} value={n}>{n} tur</option>)}
-          </select>
-          <select className={field} value={time} onChange={(e) => setTime(+e.target.value)}>
-            <option value={60}>60 sn</option><option value={120}>2 dk</option><option value={180}>3 dk</option><option value={0}>Süresiz</option>
-          </select>
+      {/* Arka plan */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-32 top-20 h-80 w-80 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-violet-500/10 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto flex w-full max-w-lg flex-col gap-7">
+
+        {/* Üst alan */}
+        <Link
+          href="/"
+          className="w-fit text-sm text-slate-400 transition hover:text-white"
+        >
+          ← Ana sayfaya dön
+        </Link>
+
+        <div className="text-center">
+          <div className="mb-4 text-6xl">⚔️</div>
+
+          <h1 className="text-4xl font-black">
+            ÇOK <span className="text-violet-400">OYUNCULU</span>
+          </h1>
+
+          <p className="mt-3 text-sm text-slate-400">
+            Arkadaşlarınla dünyayı keşfet, en iyi tahmini yap ve kazan!
+          </p>
         </div>
-        <button disabled={!nick.trim() || busy} onClick={create} className="w-full rounded-xl bg-brand py-3 font-bold text-slate-950 disabled:opacity-40">
-          {busy ? 'Oluşturuluyor…' : 'Oda oluştur'}
-        </button>
-      </section>
 
-      <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
-        <h2 className="font-bold">Odaya katıl</h2>
-        <input className={`${field} uppercase tracking-widest`} placeholder="ODA KODU" maxLength={5} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-        <button disabled={code.length < 5} onClick={() => router.push(`/room/${code}`)} className="w-full rounded-xl border border-slate-600 py-3 font-bold disabled:opacity-40">
-          Katıl
-        </button>
-      </section>
-      {err && <p className="text-center text-sm text-rose-300">{err}</p>}
+        {/* Oda oluştur */}
+        <section className="space-y-5 rounded-3xl border border-emerald-400/20 bg-slate-900/70 p-6 shadow-2xl">
+
+          <div>
+            <h2 className="text-xl font-black">
+              🌍 ODA OLUŞTUR
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Yeni bir oyun başlat ve arkadaşlarını davet et.
+            </p>
+          </div>
+
+          <div>
+            <label
+              htmlFor="nickname"
+              className="mb-2 block text-sm font-semibold text-slate-300"
+            >
+              Oyuncu adın
+            </label>
+
+            <input
+              id="nickname"
+              className={field}
+              placeholder="Takma adını yaz"
+              maxLength={20}
+              value={nick}
+              onChange={(e) => setNick(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="rounds"
+              className="mb-2 block text-sm font-semibold text-slate-300"
+            >
+              Tur sayısı
+            </label>
+
+            <select
+              id="rounds"
+              className={field}
+              value={rounds}
+              onChange={(e) => setRounds(Number(e.target.value))}
+            >
+              {[3, 5, 8, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n} tur
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Süre sınırı yok */}
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-400/20 bg-emerald-400/10 p-4">
+            <span className="text-2xl">♾️</span>
+
+            <div>
+              <p className="text-sm font-bold text-emerald-300">
+                Süresiz oyun
+              </p>
+
+              <p className="text-xs text-slate-400">
+                Acele etmeden keşfet ve tahminini yap.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={!nick.trim() || busy}
+            onClick={create}
+            className="w-full rounded-xl bg-emerald-400 py-4 font-black text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {busy ? 'ODA OLUŞTURULUYOR...' : '🚀 ODA OLUŞTUR'}
+          </button>
+        </section>
+
+        {/* Odaya katıl */}
+        <section className="space-y-5 rounded-3xl border border-violet-400/20 bg-slate-900/70 p-6 shadow-2xl">
+
+          <div>
+            <h2 className="text-xl font-black">
+              🔑 ODAYA KATIL
+            </h2>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Arkadaşının gönderdiği oda kodunu gir.
+            </p>
+          </div>
+
+          <input
+            aria-label="Oda kodu"
+            className={`${field} text-center text-xl font-black uppercase tracking-[0.3em]`}
+            placeholder="ODA KODU"
+            maxLength={5}
+            value={code}
+            onChange={(e) =>
+              setCode(e.target.value.toUpperCase())
+            }
+          />
+
+          <button
+            type="button"
+            disabled={code.trim().length !== 5}
+            onClick={join}
+            className="w-full rounded-xl bg-violet-500 py-4 font-black text-white transition hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ⚔️ ODAYA KATIL
+          </button>
+        </section>
+
+        {err && (
+          <div
+            role="alert"
+            className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-center text-sm text-rose-300"
+          >
+            {err}
+          </div>
+        )}
+
+        <p className="text-center text-xs text-slate-500">
+          HAGY GUESS · Arkadaşlarınla keşfet!
+        </p>
+      </div>
     </main>
   );
 }
