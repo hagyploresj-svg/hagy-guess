@@ -4,65 +4,43 @@ import 'server-only';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { admin } from './supabase-server';
 import { ApiError } from './http';
-import {
-  getImageById,
-  pickRandomLocation,
-} from './mapillary';
+import { getImageById } from './mapillary';
+import { pickPreparedRounds } from './fast-pool';
 import { haversineKm, scoreFor } from './geo';
-import type {
-  Creds,
-  RoomState,
-  LatLng,
-  RoundImage,
-} from './types';
+import type { Creds, RoomState } from './types';
 
 export const GRACE_MS = 3000;
 
 const MAX_PLAYERS = 8;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-const MIN_DISTANCE_KM = 25;
-const MAX_LOCATION_ATTEMPTS = 12;
-
 type Row = Record<string, any>;
 
-type PickedLocation = {
-  image: RoundImage;
-  location: LatLng;
-};
-
-function check<T>(r: {
+function check<T>(result: {
   data: T | null;
-  error: {
-    message: string;
-    code?: string;
-  } | null;
+  error: { message: string; code?: string } | null;
 }): T {
-  if (r.error) {
-    console.error('[supabase]', r.error);
+  if (result.error) {
+    console.error('[supabase]', result.error);
     throw new ApiError(500, 'Veritabanı hatası');
   }
 
-  return r.data as T;
+  return result.data as T;
 }
 
-const endsAt = (limitSec: number) =>
-  limitSec > 0
-    ? new Date(
-        Date.now() + limitSec * 1000
-      ).toISOString()
+const endsAt = (seconds: number) =>
+  seconds > 0
+    ? new Date(Date.now() + seconds * 1000).toISOString()
     : null;
 
-// ODAYI BUL
-
 async function getRoom(code: string): Promise<Row> {
-  const result = await admin()
-    .from('rooms')
-    .select('*')
-    .eq('code', code.toUpperCase())
-    .maybeSingle();
-
-  const room = check<Row | null>(result);
+  const room = check<Row | null>(
+    await admin()
+      .from('rooms')
+      .select('*')
+      .eq('code', code.toUpperCase())
+      .maybeSingle()
+  );
 
   if (!room) {
     throw new ApiError(404, 'Oda bulunamadı');
@@ -71,35 +49,30 @@ async function getRoom(code: string): Promise<Row> {
   return room;
 }
 
-// OYUNCUYU DOĞRULA
-
-async function auth(
-  room: Row,
-  c: Creds
-): Promise<Row> {
+async function auth(room: Row, creds: Creds): Promise<Row> {
   const player = check<Row | null>(
     await admin()
       .from('players')
       .select('*')
-      .eq('id', c.playerId)
+      .eq('id', creds.playerId)
       .eq('room_id', room.id)
       .maybeSingle()
   );
 
-  const sec = check<Row | null>(
+  const secretRow = check<Row | null>(
     await admin()
       .from('player_secrets')
       .select('secret')
-      .eq('player_id', c.playerId)
+      .eq('player_id', creds.playerId)
       .maybeSingle()
   );
 
-  const a = Buffer.from(sec?.secret ?? '');
-  const b = Buffer.from(c.secret ?? '');
+  const a = Buffer.from(secretRow?.secret ?? '');
+  const b = Buffer.from(creds.secret ?? '');
 
   if (
     !player ||
-    !sec ||
+    !secretRow ||
     a.length !== b.length ||
     !timingSafeEqual(a, b)
   ) {
@@ -111,30 +84,23 @@ async function auth(
 
 export function credsFrom(req: Request): Creds {
   return {
-    playerId:
-      req.headers.get('x-player-id') ?? '',
-    secret:
-      req.headers.get('x-player-secret') ?? '',
+    playerId: req.headers.get('x-player-id') ?? '',
+    secret: req.headers.get('x-player-secret') ?? '',
   };
 }
 
-function cleanNick(n: string): string {
-  const value = n
+function cleanNick(nickname: string): string {
+  const value = nickname
     .trim()
     .replace(/\s+/g, ' ')
     .slice(0, 20);
 
   if (!value) {
-    throw new ApiError(
-      400,
-      'Takma ad gerekli'
-    );
+    throw new ApiError(400, 'Takma ad gerekli');
   }
 
   return value;
 }
-
-// OYUNCU EKLE
 
 async function addPlayer(
   roomId: string,
@@ -153,8 +119,7 @@ async function addPlayer(
       .single()
   );
 
-  const secret =
-    randomBytes(24).toString('base64url');
+  const secret = randomBytes(24).toString('base64url');
 
   check(
     await admin()
@@ -182,10 +147,10 @@ export async function createRoom(
 ) {
   const nick = cleanNick(nickname);
 
-  for (let i = 0; i < 5; i++) {
+  for (let attempt = 0; attempt < 5; attempt++) {
     const code = Array.from(
       randomBytes(5),
-      (b) => ALPHABET[b % ALPHABET.length]
+      (byte) => ALPHABET[byte % ALPHABET.length]
     ).join('');
 
     const result = await admin()
@@ -206,18 +171,11 @@ export async function createRoom(
 
     return {
       code,
-      ...(await addPlayer(
-        room.id,
-        nick,
-        true
-      )),
+      ...(await addPlayer(room.id, nick, true)),
     };
   }
 
-  throw new ApiError(
-    500,
-    'Oda kodu üretilemedi'
-  );
+  throw new ApiError(500, 'Oda kodu üretilemedi');
 }
 
 // ODAYA KATIL
@@ -229,10 +187,7 @@ export async function joinRoom(
   const room = await getRoom(code);
 
   if (room.status !== 'lobby') {
-    throw new ApiError(
-      409,
-      'Oyun çoktan başladı'
-    );
+    throw new ApiError(409, 'Oyun çoktan başladı');
   }
 
   const nick = cleanNick(nickname);
@@ -250,121 +205,25 @@ export async function joinRoom(
 
   if (
     players.some(
-      (p) =>
-        p.nickname.toLowerCase() ===
-        nick.toLowerCase()
+      (player) =>
+        player.nickname.toLowerCase() === nick.toLowerCase()
     )
   ) {
-    throw new ApiError(
-      409,
-      'Bu takma ad alınmış'
-    );
+    throw new ApiError(409, 'Bu takma ad alınmış');
   }
 
-  return addPlayer(
-    room.id,
-    nick,
-    false
-  );
+  return addPlayer(room.id, nick, false);
 }
 
-// FARKLI KONUM BUL
-// Daha önce oynanan turlar tekrar seçilmez.
-
-async function prepareNextLocation(
-  roomId: string
-): Promise<PickedLocation> {
-  const previous = check<Row[]>(
-    await admin()
-      .from('room_rounds')
-      .select('image_id,lat,lng')
-      .eq('room_id', roomId)
-  );
-
-  for (
-    let attempt = 0;
-    attempt < MAX_LOCATION_ATTEMPTS;
-    attempt++
-  ) {
-    const candidate =
-      await pickRandomLocation();
-
-    const different = previous.every(
-      (item) => {
-        if (
-          item.image_id ===
-          candidate.image.imageId
-        ) {
-          return false;
-        }
-
-        return (
-          haversineKm(
-            {
-              lat: item.lat,
-              lng: item.lng,
-            },
-            candidate.location
-          ) >= MIN_DISTANCE_KM
-        );
-      }
-    );
-
-    if (different) {
-      return candidate;
-    }
-  }
-
-  throw new ApiError(
-    503,
-    'Farklı panorama bulunamadı. Tekrar dene.',
-    3
-  );
-}
-
-// TUR KONUMUNU KAYDET
-
-async function saveRound(
-  roomId: string,
-  roundNo: number,
-  candidate: PickedLocation
-): Promise<void> {
-  const result = await admin()
-    .from('room_rounds')
-    .insert({
-      room_id: roomId,
-      round_no: roundNo,
-      image_id: candidate.image.imageId,
-      sequence_id:
-        candidate.image.sequenceId,
-      lat: candidate.location.lat,
-      lng: candidate.location.lng,
-    });
-
-  if (result.error?.code === '23505') {
-    // Aynı tur başka bir istek tarafından
-    // hazırlanmış olabilir.
-    return;
-  }
-
-  if (result.error) {
-    console.error(result.error);
-
-    throw new ApiError(
-      500,
-      'Tur konumu kaydedilemedi'
-    );
-  }
-}
-
-// OYUNU HIZLI BAŞLAT
+// OYUNU BAŞLAT
+// TÜM TURLAR HAZIR HAVUZDAN SEÇİLİR.
 
 export async function startGame(
   code: string,
-  c: Creds
+  creds: Creds
 ) {
   const room = await getRoom(code);
-  const me = await auth(room, c);
+  const me = await auth(room, creds);
 
   if (!me.is_host) {
     throw new ApiError(
@@ -376,32 +235,35 @@ export async function startGame(
   const lock = check<Row[]>(
     await admin()
       .from('rooms')
-      .update({
-        status: 'starting',
-      })
+      .update({ status: 'starting' })
       .eq('id', room.id)
       .eq('status', 'lobby')
       .select('id')
   );
 
   if (!lock.length) {
-    throw new ApiError(
-      409,
-      'Oyun zaten başlıyor'
-    );
+    throw new ApiError(409, 'Oyun zaten başlıyor');
   }
 
   try {
-    // SADECE İLK TURU HAZIRLA.
-    // Diğer turlar başlangıcı geciktirmez.
+    const prepared = await pickPreparedRounds(
+      room.total_rounds
+    );
 
-    const firstLocation =
-      await prepareNextLocation(room.id);
+    const rounds = prepared.map((item, index) => ({
+      room_id: room.id,
+      round_no: index + 1,
+      image_id: item.imageId,
+      sequence_id: item.sequenceId,
+      lat: item.location.lat,
+      lng: item.location.lng,
+    }));
 
-    await saveRound(
-      room.id,
-      1,
-      firstLocation
+    check(
+      await admin()
+        .from('room_rounds')
+        .insert(rounds)
+        .select('id')
     );
 
     check(
@@ -421,8 +283,7 @@ export async function startGame(
         .update({
           status: 'playing',
           current_round: 1,
-          round_ends_at:
-            endsAt(room.time_limit_sec),
+          round_ends_at: endsAt(room.time_limit_sec),
         })
         .eq('id', room.id)
         .eq('status', 'starting')
@@ -456,9 +317,7 @@ async function finishRound(
 ) {
   await admin()
     .from('rooms')
-    .update({
-      status: 'results',
-    })
+    .update({ status: 'results' })
     .eq('id', roomId)
     .eq('status', 'playing')
     .eq('current_round', roundNo);
@@ -468,18 +327,15 @@ async function finishRound(
 
 export async function submitGuess(
   code: string,
-  c: Creds,
+  creds: Creds,
   lat: number,
   lng: number
 ) {
   const room = await getRoom(code);
-  const me = await auth(room, c);
+  const me = await auth(room, creds);
 
   if (room.status !== 'playing') {
-    throw new ApiError(
-      409,
-      'Şu an tahmin alınmıyor'
-    );
+    throw new ApiError(409, 'Şu an tahmin alınmıyor');
   }
 
   if (
@@ -488,42 +344,31 @@ export async function submitGuess(
     Math.abs(lat) > 90 ||
     Math.abs(lng) > 180
   ) {
-    throw new ApiError(
-      400,
-      'Geçersiz koordinat'
-    );
+    throw new ApiError(400, 'Geçersiz koordinat');
   }
 
   if (
     room.round_ends_at &&
     Date.now() >
-      new Date(
-        room.round_ends_at
-      ).getTime() + GRACE_MS
+      new Date(room.round_ends_at).getTime() + GRACE_MS
   ) {
-    throw new ApiError(
-      409,
-      'Süre doldu'
-    );
+    throw new ApiError(409, 'Süre doldu');
   }
 
-  const rr = check<Row>(
+  const round = check<Row>(
     await admin()
       .from('room_rounds')
       .select('lat,lng')
       .eq('room_id', room.id)
-      .eq(
-        'round_no',
-        room.current_round
-      )
+      .eq('round_no', room.current_round)
       .single()
   );
 
   const distanceKm = haversineKm(
     { lat, lng },
     {
-      lat: rr.lat,
-      lng: rr.lng,
+      lat: round.lat,
+      lng: round.lng,
     }
   );
 
@@ -550,14 +395,10 @@ export async function submitGuess(
 
   if (result.error) {
     console.error(result.error);
-
-    throw new ApiError(
-      500,
-      'Veritabanı hatası'
-    );
+    throw new ApiError(500, 'Veritabanı hatası');
   }
 
-  const all = check<Row[]>(
+  const guesses = check<Row[]>(
     await admin()
       .from('guesses')
       .select('score')
@@ -565,9 +406,8 @@ export async function submitGuess(
       .eq('player_id', me.id)
   );
 
-  const total = all.reduce(
-    (sum, guess) =>
-      sum + guess.score,
+  const totalScore = guesses.reduce(
+    (sum, guess) => sum + guess.score,
     0
   );
 
@@ -575,7 +415,7 @@ export async function submitGuess(
     await admin()
       .from('players')
       .update({
-        total_score: total,
+        total_score: totalScore,
         has_guessed: true,
       })
       .eq('id', me.id)
@@ -591,47 +431,39 @@ export async function submitGuess(
   );
 
   if (pending.length === 0) {
-    await finishRound(
-      room.id,
-      room.current_round
-    );
+    await finishRound(room.id, room.current_round);
   }
 }
 
-// SÜRE DOLDUYSA TURU BİTİR
+// SÜRE KONTROLÜ
 
 export async function advanceIfExpired(
   code: string,
-  c: Creds
+  creds: Creds
 ) {
   const room = await getRoom(code);
 
-  await auth(room, c);
+  await auth(room, creds);
 
   if (
     room.status === 'playing' &&
     room.round_ends_at &&
     Date.now() >
-      new Date(
-        room.round_ends_at
-      ).getTime() + GRACE_MS
+      new Date(room.round_ends_at).getTime() + GRACE_MS
   ) {
-    await finishRound(
-      room.id,
-      room.current_round
-    );
+    await finishRound(room.id, room.current_round);
   }
 }
 
 // SONRAKİ TUR
-// Yeni konum yalnızca burada hazırlanır.
+// YENİ KONUM ARAMASI YAPILMAZ.
 
 export async function nextRound(
   code: string,
-  c: Creds
+  creds: Creds
 ) {
   const room = await getRoom(code);
-  const me = await auth(room, c);
+  const me = await auth(room, creds);
 
   if (!me.is_host) {
     throw new ApiError(
@@ -641,22 +473,14 @@ export async function nextRound(
   }
 
   if (room.status !== 'results') {
-    throw new ApiError(
-      409,
-      'Tur henüz bitmedi'
-    );
+    throw new ApiError(409, 'Tur henüz bitmedi');
   }
 
-  if (
-    room.current_round >=
-    room.total_rounds
-  ) {
+  if (room.current_round >= room.total_rounds) {
     check(
       await admin()
         .from('rooms')
-        .update({
-          status: 'finished',
-        })
+        .update({ status: 'finished' })
         .eq('id', room.id)
         .eq('status', 'results')
         .select('id')
@@ -665,10 +489,7 @@ export async function nextRound(
     return;
   }
 
-  const nextRoundNo =
-    room.current_round + 1;
-
-  // Önce yeni turun kaydı var mı kontrol et.
+  const nextRoundNo = room.current_round + 1;
 
   const existing = check<Row | null>(
     await admin()
@@ -680,58 +501,45 @@ export async function nextRound(
   );
 
   if (!existing) {
-    // Önceki turlardan farklı konum seç.
-    const location =
-      await prepareNextLocation(room.id);
-
-    await saveRound(
-      room.id,
-      nextRoundNo,
-      location
+    throw new ApiError(
+      503,
+      'Sonraki tur konumu hazır değil'
     );
   }
 
-  // Oyuncuların tahmin durumunu sıfırla.
-
-  check(
-    await admin()
-      .from('players')
-      .update({
-        has_guessed: false,
-      })
-      .eq('room_id', room.id)
-      .select('id')
-  );
-
-  // Yeni tura geç.
-
-  check(
+  const updated = check<Row[]>(
     await admin()
       .from('rooms')
       .update({
         status: 'playing',
         current_round: nextRoundNo,
-        round_ends_at:
-          endsAt(room.time_limit_sec),
+        round_ends_at: endsAt(room.time_limit_sec),
       })
       .eq('id', room.id)
       .eq('status', 'results')
-      .eq(
-        'current_round',
-        room.current_round
-      )
+      .eq('current_round', room.current_round)
       .select('id')
   );
+
+  if (updated.length) {
+    check(
+      await admin()
+        .from('players')
+        .update({ has_guessed: false })
+        .eq('room_id', room.id)
+        .select('id')
+    );
+  }
 }
 
 // ODA DURUMU
 
 export async function getState(
   code: string,
-  c: Creds
+  creds: Creds
 ): Promise<RoomState> {
   const room = await getRoom(code);
-  const me = await auth(room, c);
+  const me = await auth(room, creds);
 
   const players = check<Row[]>(
     await admin()
@@ -748,29 +556,22 @@ export async function getState(
 
   if (
     room.current_round > 0 &&
-    [
-      'playing',
-      'results',
-      'finished',
-    ].includes(room.status)
+    ['playing', 'results', 'finished'].includes(
+      room.status
+    )
   ) {
-    const rr = check<Row>(
+    const roundRow = check<Row>(
       await admin()
         .from('room_rounds')
         .select('*')
         .eq('room_id', room.id)
-        .eq(
-          'round_no',
-          room.current_round
-        )
+        .eq('round_no', room.current_round)
         .single()
     );
 
     round = {
       roundNo: room.current_round,
-      image: await getImageById(
-        rr.image_id
-      ),
+      image: await getImageById(roundRow.image_id),
     };
 
     if (room.status !== 'playing') {
@@ -779,28 +580,21 @@ export async function getState(
           .from('guesses')
           .select('*')
           .eq('room_id', room.id)
-          .eq(
-            'round_no',
-            room.current_round
-          )
+          .eq('round_no', room.current_round)
       );
 
       reveal = {
         actual: {
-          lat: rr.lat,
-          lng: rr.lng,
+          lat: roundRow.lat,
+          lng: roundRow.lng,
         },
-        guesses: guesses.map(
-          (guess) => ({
-            playerId:
-              guess.player_id,
-            lat: guess.lat,
-            lng: guess.lng,
-            distanceKm:
-              guess.distance_km,
-            score: guess.score,
-          })
-        ),
+        guesses: guesses.map((guess) => ({
+          playerId: guess.player_id,
+          lat: guess.lat,
+          lng: guess.lng,
+          distanceKm: guess.distance_km,
+          score: guess.score,
+        })),
       };
     }
   }
@@ -812,29 +606,19 @@ export async function getState(
       id: room.id,
       code: room.code,
       status: room.status,
-      totalRounds:
-        room.total_rounds,
-      timeLimitSec:
-        room.time_limit_sec,
-      currentRound:
-        room.current_round,
-      roundEndsAt:
-        room.round_ends_at,
+      totalRounds: room.total_rounds,
+      timeLimitSec: room.time_limit_sec,
+      currentRound: room.current_round,
+      roundEndsAt: room.round_ends_at,
     },
 
-    players: players.map(
-      (player) => ({
-        id: player.id,
-        nickname:
-          player.nickname,
-        isHost:
-          player.is_host,
-        totalScore:
-          player.total_score,
-        hasGuessed:
-          player.has_guessed,
-      })
-    ),
+    players: players.map((player) => ({
+      id: player.id,
+      nickname: player.nickname,
+      isHost: player.is_host,
+      totalScore: player.total_score,
+      hasGuessed: player.has_guessed,
+    })),
 
     me: {
       id: me.id,
