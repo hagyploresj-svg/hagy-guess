@@ -1014,3 +1014,61 @@ export async function moveAlong(
     ids[targetIndex]
   );
 }
+
+/**
+ * Dünya genelinden yeni 360° panoramalar keşfeder.
+ * Bulunan panoramalar discoverRegion()
+ * tarafından Supabase'e kaydedilir.
+ *
+ * count = taranacak bölge sayısıdır,
+ * panorama sayısı değildir.
+ */
+export async function refillPanoramaPool(
+  count: number = 3
+): Promise<{
+  regionsChecked: number;
+  panoramasFound: number;
+  successfulRegions: number;
+  errors: string[];
+}> {
+  const target = Math.min(
+    5,
+    Math.max(1, Math.floor(count || 3))
+  );
+
+  const indexes = shuffledSeedIndexes().slice(
+    0,
+    target
+  );
+
+  const results = await Promise.allSettled(
+    indexes.map((index) => loadRegion(index))
+  );
+
+  let panoramasFound = 0;
+  let successfulRegions = 0;
+  const errors: string[] = [];
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      panoramasFound += result.value.length;
+
+      if (result.value.length > 0) {
+        successfulRegions++;
+      }
+    } else {
+      errors.push(
+        result.reason instanceof Error
+          ? result.reason.message
+          : 'Bilinmeyen Mapillary hatası'
+      );
+    }
+  }
+
+  return {
+    regionsChecked: indexes.length,
+    panoramasFound,
+    successfulRegions,
+    errors,
+  };
+}
