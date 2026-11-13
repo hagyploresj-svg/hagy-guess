@@ -9,22 +9,19 @@ import type { LatLng, RoundImage } from './types';
 
 const BASE = 'https://graph.mapillary.com';
 
-// Yüksek kaliteli fotoğraf alanları
 const IMG_FIELDS =
   'id,is_pano,captured_at,sequence,thumb_2048_url,thumb_original_url,geometry,computed_geometry,creator';
 
-// Performans ayarları
+// Genel ayarlar
 const MAX_CONCURRENT = 4;
-const MAX_PICK_ATTEMPTS = 5;
-const PANO_ONLY_ATTEMPTS = 2;
+const MAX_PICK_ATTEMPTS = 8;
 const SEED_JITTER_DEG = 0.3;
-const BBOX_HALF_DEG = 0.02;
+const BBOX_HALF_DEG = 0.04;
 
-// İleri ve geri hareket mesafesi
-const MOVE_STEP = 4;
+// İleri ve geri hareket: 3 kare
+const MOVE_STEP = 3;
 
 const MIN_YEAR = 2014;
-
 const CACHE_TTL = 10 * 60 * 1000;
 const MAX_CACHE_SIZE = 800;
 
@@ -33,8 +30,6 @@ interface RawImage {
   is_pano?: boolean;
   captured_at?: number | string;
   sequence?: string;
-
-  // Fotoğraf çözünürlükleri
   thumb_2048_url?: string;
   thumb_original_url?: string;
 
@@ -62,7 +57,7 @@ interface ParsedImage {
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-// API eşzamanlılık kontrolü
+// API isteklerini sınırla
 let active = 0;
 const waiters: Array<() => void> = [];
 
@@ -95,7 +90,7 @@ function busy(seconds: number) {
   );
 }
 
-// Mapillary API bağlantısı
+// Mapillary API
 async function mly<T>(
   path: string,
   params: Record<string, string | number | boolean>
@@ -191,7 +186,7 @@ async function mly<T>(
   }
 }
 
-// Bellek önbelleği
+// Önbellek
 const cache = new Map<
   string,
   {
@@ -232,13 +227,13 @@ function cacheSet(
   });
 }
 
-// Aynı görüntü için tekrar eden istekleri birleştir
+// Aynı fotoğrafa yapılan istekleri birleştir
 const pendingImages = new Map<
   string,
   Promise<RoundImage>
 >();
 
-// Gelen fotoğraf verisini düzenle
+// API fotoğraf verisini düzenle
 function parse(raw: RawImage): ParsedImage | null {
   const coordinates =
     (raw.computed_geometry ?? raw.geometry)?.coordinates;
@@ -264,12 +259,7 @@ function parse(raw: RawImage): ParsedImage | null {
   let capturedAt: string | null = null;
 
   if (raw.captured_at) {
-    const value = raw.captured_at;
-
-    const date =
-      typeof value === 'number'
-        ? new Date(value)
-        : new Date(value);
+    const date = new Date(raw.captured_at);
 
     if (!Number.isNaN(date.getTime())) {
       capturedAt = date.toISOString();
@@ -281,10 +271,7 @@ function parse(raw: RawImage): ParsedImage | null {
       imageId: raw.id,
       sequenceId: raw.sequence ?? null,
       isPano: raw.is_pano === true,
-
-      // Orijinal kaliteyi tercih et
       imageUrl: originalUrl ?? fallbackUrl ?? '',
-
       creator: raw.creator?.username ?? null,
       capturedAt,
     },
@@ -325,46 +312,24 @@ async function reachable(
   }
 }
 
-// Orijinal çözünürlük varsa kullan,
-// yoksa 2048 sürümüne dön
+// En kaliteli çalışan görüntüyü seç
 async function selectBestQuality(
   parsed: ParsedImage
 ): Promise<RoundImage | null> {
-  const {
-    image,
-    originalUrl,
-    fallbackUrl,
-  } = parsed;
+  const { image, originalUrl, fallbackUrl } = parsed;
 
-  // Önce yüksek çözünürlük
-  if (originalUrl) {
-    const works = await reachable(originalUrl, 1500);
-
-    if (works) {
-      return {
-        ...image,
-        imageUrl: originalUrl,
-      };
-    }
+  if (originalUrl && await reachable(originalUrl)) {
+    return {
+      ...image,
+      imageUrl: originalUrl,
+    };
   }
 
-  // Yüksek kalite yoksa 2048 kullan
-  if (fallbackUrl) {
-    if (fallbackUrl === originalUrl) {
-      return {
-        ...image,
-        imageUrl: fallbackUrl,
-      };
-    }
-
-    const works = await reachable(fallbackUrl, 1500);
-
-    if (works) {
-      return {
-        ...image,
-        imageUrl: fallbackUrl,
-      };
-    }
+  if (fallbackUrl && await reachable(fallbackUrl)) {
+    return {
+      ...image,
+      imageUrl: fallbackUrl,
+    };
   }
 
   return null;
@@ -389,15 +354,13 @@ function pickSeedIndex(): number {
   for (let i = 0; i < weights.length; i++) {
     random -= weights[i];
 
-    if (random <= 0) {
-      return i;
-    }
+    if (random <= 0) return i;
   }
 
   return 0;
 }
 
-// Yeni oyun için sokak görüntüsü seç
+// Yeni tur: sadece 360° panorama
 export async function pickRandomLocation(): Promise<{
   image: RoundImage;
   location: LatLng;
@@ -424,9 +387,6 @@ export async function pickRandomLocation(): Promise<{
       .map((value) => value.toFixed(5))
       .join(',');
 
-    const panoOnly =
-      attempt < PANO_ONLY_ATTEMPTS;
-
     let rawImages: RawImage[] = [];
 
     try {
@@ -436,7 +396,7 @@ export async function pickRandomLocation(): Promise<{
         bbox,
         fields: IMG_FIELDS,
         limit: 100,
-        ...(panoOnly ? { is_pano: true } : {}),
+        is_pano: true,
       });
 
       rawImages = response.data ?? [];
@@ -462,10 +422,7 @@ export async function pickRandomLocation(): Promise<{
         (item): item is ParsedImage =>
           item !== null
       )
-      .filter(
-        (item) =>
-          !panoOnly || item.image.isPano
-      )
+      .filter((item) => item.image.isPano)
       .filter(
         (item) =>
           !item.image.capturedAt ||
@@ -474,7 +431,7 @@ export async function pickRandomLocation(): Promise<{
           ).getUTCFullYear() >= MIN_YEAR
       )
       .sort(() => Math.random() - 0.5)
-      .slice(0, 2);
+      .slice(0, 3);
 
     for (const candidate of candidates) {
       const bestImage =
@@ -501,12 +458,12 @@ export async function pickRandomLocation(): Promise<{
 
   throw new ApiError(
     503,
-    'Uygun sokak görüntüsü bulunamadı. Tekrar dene.',
+    '360° panorama bulunamadı. Tekrar dene.',
     3
   );
 }
 
-// Görüntüyü ID ile getir
+// Fotoğrafı ID ile getir
 export async function getImageById(
   id: string
 ): Promise<RoundImage> {
@@ -514,15 +471,11 @@ export async function getImageById(
     `img:${id}`
   );
 
-  if (cached) {
-    return cached;
-  }
+  if (cached) return cached;
 
   const existing = pendingImages.get(id);
 
-  if (existing) {
-    return existing;
-  }
+  if (existing) return existing;
 
   const request = (async () => {
     const raw = await mly<RawImage>(
@@ -538,6 +491,13 @@ export async function getImageById(
       throw new ApiError(
         502,
         'Görüntü alınamadı'
+      );
+    }
+
+    if (!parsed.image.isPano) {
+      throw new ApiError(
+        404,
+        'Bu konumda 360° panorama bulunamadı'
       );
     }
 
@@ -568,7 +528,7 @@ export async function getImageById(
   }
 }
 
-// Sekans bilgilerini önbellekle
+// Sekans önbelleği
 const pendingSequences = new Map<
   string,
   Promise<string[]>
@@ -583,22 +543,15 @@ async function sequenceIds(
     cacheKey
   );
 
-  if (cached) {
-    return cached;
-  }
+  if (cached) return cached;
 
-  const existing =
-    pendingSequences.get(sequenceId);
+  const existing = pendingSequences.get(sequenceId);
 
-  if (existing) {
-    return existing;
-  }
+  if (existing) return existing;
 
   const request = (async () => {
     const response = await mly<{
-      data?: {
-        id: string;
-      }[];
+      data?: { id: string }[];
     }>('/image_ids', {
       sequence_id: sequenceId,
     });
@@ -621,14 +574,13 @@ async function sequenceIds(
   }
 }
 
-// İleri ve geri hareket: 4 kare atlama
+// İleri ve geri: 3 kare atla
 export async function moveAlong(
   imageId: string,
   sequenceId: string,
   direction: 'next' | 'prev'
 ): Promise<RoundImage> {
   const ids = await sequenceIds(sequenceId);
-
   const index = ids.indexOf(imageId);
 
   if (index < 0) {
