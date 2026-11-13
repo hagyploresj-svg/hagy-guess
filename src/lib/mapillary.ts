@@ -16,7 +16,7 @@ const MAX_PICK_ATTEMPTS = 10;
 const PANO_ONLY_ATTEMPTS = 7;
 const SEED_JITTER_DEG = 0.3;
 const BBOX_HALF_DEG = 0.02;
-const MOVE_STEP = 1;
+const MOVE_STEP = 4;
 const MIN_YEAR = 2014;
 
 const CACHE_TTL = 10 * 60 * 1000;
