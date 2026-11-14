@@ -1,341 +1,437 @@
 
 import Link from 'next/link';
 
+const features = [
+  {
+    number: '01',
+    icon: '◎',
+    title: 'Çevreni incele',
+    description:
+      'Sokakları, yapıları, tabelaları ve doğayı keşfet.',
+  },
+  {
+    number: '02',
+    icon: '⌖',
+    title: 'İpuçlarını birleştir',
+    description:
+      'Gördüklerinden yola çıkarak nerede olduğunu düşün.',
+  },
+  {
+    number: '03',
+    icon: '↗',
+    title: 'Konumu işaretle',
+    description:
+      'Haritada tahminini yap ve ne kadar yaklaştığını gör.',
+  },
+];
+
+function BrandMark({ large = false }: { large?: boolean }) {
+  return (
+    <div
+      className={`relative flex shrink-0 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 ${
+        large ? 'h-20 w-20' : 'h-11 w-11'
+      }`}
+    >
+      <svg
+        viewBox="0 0 64 64"
+        fill="none"
+        className={large ? 'h-14 w-14' : 'h-8 w-8'}
+        aria-hidden="true"
+      >
+        <circle
+          cx="32"
+          cy="32"
+          r="24"
+          stroke="#67E8F9"
+          strokeWidth="2"
+          strokeDasharray="5 5"
+        />
+        <path
+          d="M32 9L40 27L55 32L40 37L32 55L24 37L9 32L24 27L32 9Z"
+          fill="#22D3EE"
+          fillOpacity=".16"
+          stroke="#67E8F9"
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        <circle cx="32" cy="32" r="5" fill="#A5F3FC" />
+      </svg>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-[#070d1b] text-white">
-      {/* Arka plan ışıkları */}
+    <main className="relative isolate min-h-dvh overflow-hidden bg-[#07111d] text-white">
+      {/* Arka plan */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-20 h-[500px] w-[500px] rounded-full bg-emerald-500/10 blur-[110px]" />
-        <div className="absolute -right-40 top-1/3 h-[550px] w-[550px] rounded-full bg-violet-600/15 blur-[120px]" />
-        <div className="absolute bottom-0 left-1/3 h-[350px] w-[350px] rounded-full bg-blue-500/10 blur-[100px]" />
-
+        <div className="absolute -left-48 top-24 h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[120px]" />
+        <div className="absolute -right-48 top-1/3 h-[520px] w-[520px] rounded-full bg-teal-500/10 blur-[120px]" />
+        <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-blue-500/10 blur-[110px]" />
         <div
           className="absolute inset-0 opacity-[0.035]"
           style={{
             backgroundImage:
-              'linear-gradient(#ffffff 1px, transparent 1px), linear-gradient(90deg, #ffffff 1px, transparent 1px)',
-            backgroundSize: '65px 65px',
+              'linear-gradient(#ffffff 1px,transparent 1px),linear-gradient(90deg,#ffffff 1px,transparent 1px)',
+            backgroundSize: '56px 56px',
           }}
         />
       </div>
 
       {/* Üst menü */}
-      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-5 sm:px-6 sm:py-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-400/10 text-xl sm:h-11 sm:w-11 sm:text-2xl">
-            🌍
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-5 sm:px-6">
+        <Link href="/" className="flex items-center gap-3">
+          <BrandMark />
+          <div className="leading-tight">
+            <span className="block text-lg font-black tracking-tight">
+              HAGY<span className="text-cyan-300">GUESS</span>
+            </span>
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Explore the unknown
+            </span>
           </div>
-
-          <span className="text-base font-black tracking-tight sm:text-xl">
-            HAGY <span className="text-emerald-400">GUESS</span>
-          </span>
         </Link>
 
-        <nav className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-          <span className="hidden rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-xs font-bold text-emerald-300 lg:inline-flex">
-            ● ÜCRETSİZ OYNA
-          </span>
-
+        <nav className="flex items-center gap-2">
           <Link
             href="/login"
-            className="rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-xs font-bold transition hover:bg-white/20 sm:px-5 sm:text-sm"
+            className="rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-slate-200 transition hover:bg-white/10 sm:px-5 sm:text-sm"
           >
             Giriş Yap
           </Link>
-
           <Link
             href="/register"
-            className="rounded-xl bg-emerald-400 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-emerald-300 sm:px-5 sm:text-sm"
+            className="rounded-xl bg-cyan-300 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200 sm:px-5 sm:text-sm"
           >
             Kayıt Ol
-          </Link>
-
-          <Link
-            href="/play"
-            className="hidden rounded-xl border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-bold transition hover:bg-white/20 md:inline-flex"
-          >
-            Oyuna Başla
           </Link>
         </nav>
       </header>
 
-      {/* Ana içerik */}
-      <section className="relative z-10 mx-auto flex max-w-7xl flex-col items-center px-6 pb-20 pt-10 text-center sm:pt-16">
-        <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-5 py-2 text-xs font-bold tracking-widest text-emerald-300">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-          DÜNYA SENİ BEKLİYOR
-        </div>
-
-        {/* Dünya animasyonu */}
-        <div className="relative mb-4 flex h-52 w-52 items-center justify-center sm:h-64 sm:w-64">
-          <div className="absolute inset-4 animate-pulse rounded-full bg-cyan-400/20 blur-3xl" />
-
-          <div className="absolute inset-0 rounded-full border border-emerald-400/15" />
-          <div className="absolute inset-5 rounded-full border border-cyan-400/15" />
-
-          <div
-            className="relative flex h-40 w-40 items-center justify-center rounded-full sm:h-52 sm:w-52"
-            style={{
-              background:
-                'radial-gradient(circle at 30% 25%, #38bdf8 0%, #0e7490 25%, #164e63 50%, #052e2b 75%, #020617 100%)',
-              boxShadow:
-                '0 0 65px rgba(16,185,129,0.25), inset -20px -15px 35px rgba(0,0,0,0.6)',
-              animation: 'floatGlobe 6s ease-in-out infinite',
-            }}
-          >
-            <span
-              className="select-none text-[105px] drop-shadow-2xl sm:text-[140px]"
-              role="img"
-              aria-label="Dünya"
-            >
-              🌍
-            </span>
+      {/* Ana bölüm */}
+      <section className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 px-5 pb-16 pt-12 sm:px-8 lg:grid-cols-2 lg:gap-16 lg:pb-28 lg:pt-24">
+        <div className="max-w-2xl">
+          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-xs font-bold tracking-widest text-cyan-200">
+            <span className="h-2 w-2 rounded-full bg-cyan-300" />
+            SINIRSIZ DÜNYA KEŞFİ
           </div>
 
-          <span className="absolute left-0 top-12 text-2xl">
-            ✨
-          </span>
-          <span className="absolute bottom-10 right-0 text-xl">
-            ✦
-          </span>
+          <h1 className="text-5xl font-black leading-[1.07] tracking-tight sm:text-6xl lg:text-7xl">
+            HER SOKAK
+            <span className="mt-2 block text-cyan-300">
+              BİR HİKÂYE.
+            </span>
+          </h1>
+
+          <p className="mt-7 max-w-xl text-base leading-8 text-slate-300 sm:text-lg">
+            Bilmediğin bir yerde gözlerini aç. Çevrendeki
+            ayrıntıları keşfet, ipuçlarını takip et ve
+            dünyanın neresinde olduğunu tahmin et.
+          </p>
+
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <Link
+              href="/play"
+              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl bg-cyan-300 px-8 py-4 text-base font-black text-slate-950 transition hover:-translate-y-1 hover:bg-cyan-200"
+            >
+              Keşfe Başla <span aria-hidden="true">↗</span>
+            </Link>
+
+            <Link
+              href="/room"
+              className="inline-flex min-h-14 items-center justify-center gap-3 rounded-2xl border border-white/20 bg-white/5 px-8 py-4 text-base font-bold transition hover:border-cyan-300/40 hover:bg-white/10"
+            >
+              Arkadaşlarla Oyna
+            </Link>
+          </div>
+
+          <div className="mt-9 flex flex-wrap gap-2">
+            {[
+              'Ücretsiz',
+              'Dünya çapında',
+              'Tekli ve çoklu oyun',
+            ].map((item) => (
+              <span
+                key={item}
+                className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-300"
+              >
+                ✓ {item}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <h1 className="max-w-4xl text-5xl font-black leading-[1.05] tracking-tight sm:text-7xl lg:text-8xl">
-          DÜNYAYI
-          <br />
-          <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
-            KEŞFET!
-          </span>
-        </h1>
+        {/* Özgün keşif paneli */}
+        <div className="relative mx-auto w-full max-w-lg">
+          <div className="absolute -inset-5 rounded-[40px] bg-cyan-400/10 blur-3xl" />
 
-        <p className="mt-7 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-xl">
-          Dünyanın rastgele bir noktasına ışınlan.
-          Sokakları incele, ipuçlarını yakala ve
-          haritada nerede olduğunu tahmin et.
-        </p>
+          <div className="relative overflow-hidden rounded-[30px] border border-cyan-200/15 bg-[#0d1b2a] p-5 shadow-2xl sm:p-7">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <BrandMark large />
+                <div>
+                  <div className="text-sm font-black tracking-widest text-cyan-200">
+                    HAGY EXPLORER
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    Keşif terminali
+                  </div>
+                </div>
+              </div>
+              <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-[10px] font-bold text-cyan-200">
+                ONLINE
+              </span>
+            </div>
 
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-slate-400 sm:text-sm">
-          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-            🌐 Dünya çapında keşif
-          </span>
+            <div className="relative mt-7 flex aspect-square items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-[#091624]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.12),transparent_65%)]" />
 
-          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-            🎯 Konum tahmini
-          </span>
+              <svg
+                viewBox="0 0 320 320"
+                className="relative h-full w-full max-w-[360px]"
+                fill="none"
+                aria-label="HAGY keşif rotası çizimi"
+                role="img"
+              >
+                {[50, 95, 140].map((r) => (
+                  <circle
+                    key={r}
+                    cx="160"
+                    cy="160"
+                    r={r}
+                    stroke="#67E8F9"
+                    strokeOpacity=".13"
+                    strokeDasharray="4 8"
+                  />
+                ))}
 
-          <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2">
-            ♾️ Sınırsız oyun
-          </span>
+                <path
+                  d="M40 215C85 185 85 100 145 118S210 242 278 85"
+                  stroke="#67E8F9"
+                  strokeWidth="3"
+                  strokeDasharray="7 8"
+                  strokeLinecap="round"
+                />
+
+                <circle cx="40" cy="215" r="7" fill="#67E8F9" />
+                <circle cx="145" cy="118" r="7" fill="#67E8F9" />
+                <circle cx="278" cy="85" r="11" fill="#22D3EE" />
+                <circle
+                  cx="278"
+                  cy="85"
+                  r="22"
+                  stroke="#22D3EE"
+                  strokeOpacity=".4"
+                />
+
+                <path
+                  d="M160 145L175 160L160 175L145 160L160 145Z"
+                  fill="#A5F3FC"
+                />
+                <path
+                  d="M160 130V190M130 160H190"
+                  stroke="#A5F3FC"
+                  strokeOpacity=".5"
+                />
+              </svg>
+
+              <span className="absolute bottom-4 left-4 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-[10px] font-semibold tracking-widest text-cyan-200">
+                UNKNOWN DESTINATION
+              </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-3 gap-3">
+              {[
+                ['01', 'GÖZLE'],
+                ['02', 'KEŞFET'],
+                ['03', 'TAHMİN ET'],
+              ].map(([number, title]) => (
+                <div
+                  key={number}
+                  className="rounded-xl border border-white/10 bg-white/[0.035] px-2 py-3 text-center"
+                >
+                  <div className="text-lg font-black text-cyan-300">
+                    {number}
+                  </div>
+                  <div className="mt-1 text-[10px] font-bold tracking-wide text-slate-400">
+                    {title}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Oyun modları */}
+      <section className="relative z-10 mx-auto max-w-7xl px-5 pb-24 sm:px-8">
+        <div className="mb-8">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-cyan-300">
+            OYUN MODLARI
+          </p>
+          <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+            Kendi yolunu seç.
+          </h2>
+          <p className="mt-3 text-slate-400">
+            Tek başına keşfet veya arkadaşlarınla yarış.
+          </p>
         </div>
 
-        {/* Oyun kartları */}
-        <div className="mt-14 grid w-full max-w-4xl grid-cols-1 gap-5 md:grid-cols-2">
+        <div className="grid gap-5 md:grid-cols-2">
           <Link
             href="/play"
-            className="group relative overflow-hidden rounded-3xl border border-emerald-400/25 bg-gradient-to-br from-emerald-500/15 via-slate-900/90 to-slate-950 p-7 text-left shadow-2xl transition duration-300 hover:-translate-y-2 hover:border-emerald-400/70 hover:shadow-emerald-500/10 sm:p-9"
+            className="group rounded-[28px] border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-slate-900/70 p-7 transition hover:-translate-y-1 hover:border-cyan-300/60 sm:p-9"
           >
-            <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-emerald-400/10 blur-3xl transition group-hover:bg-emerald-400/20" />
-
-            <div className="relative">
-              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-400/20 bg-emerald-400/10 text-4xl">
-                🎯
-              </div>
-
-              <h2 className="text-2xl font-black sm:text-3xl">
-                TEK OYUNCULU
-              </h2>
-
-              <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-slate-400">
-                Dünyayı tek başına keşfet.
-                Tahminlerini geliştir ve kendi
-                rekorunu kır.
-              </p>
-
-              <div className="mt-8 flex items-center justify-between rounded-2xl bg-emerald-400 px-6 py-4 font-black text-slate-950 transition group-hover:bg-emerald-300">
-                <span>HEMEN OYNA</span>
-                <span className="text-xl transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
+            <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-300/10 text-3xl text-cyan-200">
+              ◎
+            </div>
+            <div className="text-xs font-bold tracking-widest text-cyan-300">
+              SOLO EXPEDITION
+            </div>
+            <h3 className="mt-3 text-2xl font-black">
+              Tek Başına Keşfet
+            </h3>
+            <p className="mt-3 max-w-md leading-7 text-slate-400">
+              Yeni sokaklar, yeni ipuçları, yeni tahminler.
+              Kendi keşif yolculuğuna çık.
+            </p>
+            <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5 font-bold text-cyan-200">
+              Oyuna Gir
+              <span className="text-xl transition group-hover:translate-x-1">
+                ↗
+              </span>
             </div>
           </Link>
 
           <Link
             href="/room"
-            className="group relative overflow-hidden rounded-3xl border border-violet-400/25 bg-gradient-to-br from-violet-500/15 via-slate-900/90 to-slate-950 p-7 text-left shadow-2xl transition duration-300 hover:-translate-y-2 hover:border-violet-400/70 hover:shadow-violet-500/10 sm:p-9"
+            className="group rounded-[28px] border border-blue-300/20 bg-gradient-to-br from-blue-400/10 to-slate-900/70 p-7 transition hover:-translate-y-1 hover:border-blue-300/60 sm:p-9"
           >
-            <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-violet-400/10 blur-3xl transition group-hover:bg-violet-400/20" />
-
-            <div className="relative">
-              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/20 bg-violet-400/10 text-4xl">
-                ⚔️
-              </div>
-
-              <h2 className="text-2xl font-black sm:text-3xl">
-                ÇOK OYUNCULU
-              </h2>
-
-              <p className="mt-3 min-h-[48px] text-sm leading-relaxed text-slate-400">
-                Arkadaşlarınla aynı dünyaya
-                ışınlan. En iyi tahmini yaparak
-                rekabeti kazan.
-              </p>
-
-              <div className="mt-8 flex items-center justify-between rounded-2xl bg-violet-500 px-6 py-4 font-black text-white transition group-hover:bg-violet-400">
-                <span>ODA KUR / KATIL</span>
-                <span className="text-xl transition-transform group-hover:translate-x-1">
-                  →
-                </span>
-              </div>
+            <div className="mb-8 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-300/10 text-3xl text-blue-200">
+              ◈
+            </div>
+            <div className="text-xs font-bold tracking-widest text-blue-300">
+              CREW EXPEDITION
+            </div>
+            <h3 className="mt-3 text-2xl font-black">
+              Ekibinle Keşfet
+            </h3>
+            <p className="mt-3 max-w-md leading-7 text-slate-400">
+              Bir oda oluştur, arkadaşlarını davet et ve
+              en iyi konum tahminini yap.
+            </p>
+            <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5 font-bold text-blue-200">
+              Oda Kur veya Katıl
+              <span className="text-xl transition group-hover:translate-x-1">
+                ↗
+              </span>
             </div>
           </Link>
         </div>
+      </section>
 
-        {/* Nasıl oynanır */}
-        <div className="mt-24 w-full max-w-5xl">
-          <div className="mb-10 text-center">
-            <span className="text-xs font-bold tracking-[0.3em] text-emerald-400">
-              3 BASİT ADIM
-            </span>
+      {/* Nasıl oynanır */}
+      <section className="relative z-10 border-y border-white/10 bg-white/[0.025] px-5 py-20 sm:px-8">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-bold tracking-[0.25em] text-cyan-300">
+            KEŞİF REHBERİ
+          </p>
+          <h2 className="mt-3 text-3xl font-black sm:text-4xl">
+            Üç adımda dünyayı keşfet.
+          </h2>
 
-            <h2 className="mt-3 text-3xl font-black sm:text-4xl">
-              NASIL OYNANIR?
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[
-              {
-                number: '01',
-                icon: '🌍',
-                title: 'KEŞFET',
-                description:
-                  'Rastgele bir sokak görüntüsüne bırakıl ve çevreni incele.',
-              },
-              {
-                number: '02',
-                icon: '🔍',
-                title: 'İPUÇLARINI BUL',
-                description:
-                  'Tabelalara, yollara, doğaya ve mimariye dikkat et.',
-              },
-              {
-                number: '03',
-                icon: '📍',
-                title: 'TAHMİN ET',
-                description:
-                  'Haritada bir nokta seç ve gerçek konuma ne kadar yaklaştığını gör.',
-              },
-            ].map((step) => (
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {features.map((feature) => (
               <div
-                key={step.number}
-                className="relative rounded-2xl border border-white/10 bg-white/[0.035] p-7 text-left transition hover:border-emerald-400/30 hover:bg-white/[0.06]"
+                key={feature.number}
+                className="rounded-2xl border border-white/10 bg-[#0d1b2a] p-7"
               >
-                <span className="absolute right-6 top-5 text-4xl font-black text-white/5">
-                  {step.number}
-                </span>
-
-                <div className="mb-5 text-4xl">
-                  {step.icon}
+                <div className="flex items-center justify-between">
+                  <span className="text-4xl font-light text-cyan-300">
+                    {feature.icon}
+                  </span>
+                  <span className="text-xs font-black text-slate-600">
+                    {feature.number}
+                  </span>
                 </div>
-
-                <h3 className="text-lg font-black">
-                  {step.title}
+                <h3 className="mt-8 text-xl font-black">
+                  {feature.title}
                 </h3>
-
-                <p className="mt-3 text-sm leading-relaxed text-slate-400">
-                  {step.description}
+                <p className="mt-3 text-sm leading-7 text-slate-400">
+                  {feature.description}
                 </p>
               </div>
             ))}
           </div>
         </div>
+      </section>
 
-        {/* Alt çağrı */}
-        <div className="mt-20 w-full max-w-4xl rounded-3xl border border-emerald-400/20 bg-gradient-to-r from-emerald-500/10 via-cyan-500/5 to-violet-500/10 px-6 py-12 text-center sm:px-12">
-          <h2 className="text-3xl font-black sm:text-4xl">
-            MACERAYA HAZIR MISIN?
-          </h2>
-
-          <p className="mt-4 text-slate-400">
-            Bir sonraki durağın dünyanın herhangi
-            bir yeri olabilir.
+      {/* Alt çağrı */}
+      <section className="relative z-10 mx-auto max-w-5xl px-5 py-20 text-center">
+        <div className="rounded-[30px] border border-cyan-300/20 bg-cyan-300/[0.055] px-6 py-12 sm:px-12">
+          <p className="text-xs font-bold tracking-[0.25em] text-cyan-300">
+            HAGY GUESS
           </p>
-
+          <h2 className="mt-4 text-3xl font-black sm:text-5xl">
+            Sıradaki durak bilinmiyor.
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-slate-400">
+            Dünyanın herhangi bir noktasında yeni bir
+            macera seni bekliyor.
+          </p>
           <Link
             href="/play"
-            className="mt-8 inline-flex items-center justify-center gap-3 rounded-2xl bg-emerald-400 px-10 py-4 text-lg font-black text-slate-950 transition hover:scale-105 hover:bg-emerald-300"
+            className="mt-8 inline-flex min-h-14 items-center justify-center rounded-2xl bg-cyan-300 px-9 py-4 font-black text-slate-950 transition hover:bg-cyan-200"
           >
-            🌍 ŞİMDİ OYNA
-            <span>→</span>
+            Şimdi Keşfet ↗
           </Link>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/10 px-6 py-8">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-5 text-center text-xs text-slate-500 md:flex-row md:text-left">
+      {/* Kaynaklar */}
+      <footer className="relative z-10 border-t border-white/10 px-5 py-8 sm:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 text-xs text-slate-400 md:flex-row">
           <div>
-            <span className="font-black text-slate-300">
-              HAGY GUESS
-            </span>
-
-            <p className="mt-1">
-              Dünyayı keşfet. Konumunu tahmin et.
+            <div className="font-black text-white">
+              HAGY <span className="text-cyan-300">GUESS</span>
+            </div>
+            <p className="mt-2">
+              Bağımsız dünya keşif oyunu.
             </p>
           </div>
 
-          <div className="max-w-xl leading-relaxed">
-            Sokak görüntüleri ©{' '}
+          <div className="max-w-xl leading-6">
+            Sokak görüntüleri:{' '}
             <a
               href="https://www.mapillary.com"
               target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-slate-300"
+              rel="noopener noreferrer"
+              className="underline hover:text-white"
             >
               Mapillary
-            </a>{' '}
-            katkıcıları,{' '}
+            </a>
+            {' '}katkıcıları ·{' '}
             <a
               href="https://creativecommons.org/licenses/by-sa/4.0/"
               target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-slate-300"
+              rel="noopener noreferrer"
+              className="underline hover:text-white"
             >
               CC BY-SA 4.0
             </a>
-            . Harita verisi ©{' '}
+            . Harita verileri:{' '}
             <a
               href="https://www.openstreetmap.org/copyright"
               target="_blank"
-              rel="noreferrer"
-              className="underline hover:text-slate-300"
+              rel="noopener noreferrer"
+              className="underline hover:text-white"
             >
-              OpenStreetMap
-            </a>{' '}
-            katkıcıları.
+              © OpenStreetMap contributors
+            </a>
+            .
           </div>
         </div>
       </footer>
-
-      <style>{`
-        @keyframes floatGlobe {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-14px);
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-          }
-        }
-      `}</style>
     </main>
   );
 }
