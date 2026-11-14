@@ -629,3 +629,105 @@ export async function getState(
     reveal,
   };
 }
+
+export type RoomChatMessage = {
+  id: string;
+  playerId: string;
+  nickname: string;
+  content: string;
+  createdAt: string;
+};
+
+// Odadaki son 60 mesajı getir
+export async function getRoomMessages(
+  code: string,
+  creds: Creds
+): Promise<RoomChatMessage[]> {
+  const room = await getRoom(code);
+  await auth(room, creds);
+
+  const rows = check<Row[]>(
+    await admin()
+      .from('room_messages')
+      .select('id,player_id,content,created_at')
+      .eq('room_id', room.id)
+      .order('created_at', { ascending: false })
+      .limit(60)
+  );
+
+  const players = check<Row[]>(
+    await admin()
+      .from('players')
+      .select('id,nickname')
+      .eq('room_id', room.id)
+  );
+
+  const names = new Map(
+    players.map((p) => [p.id, p.nickname])
+  );
+
+  return rows.reverse().map((m) => ({
+    id: m.id,
+    playerId: m.player_id,
+    nickname: names.get(m.player_id) ?? 'Oyuncu',
+    content: m.content,
+    createdAt: m.created_at,
+  }));
+}
+
+// Odaya yeni mesaj gönder
+export async function sendRoomMessage(
+  code: string,
+  creds: Creds,
+  content: string
+): Promise<void> {
+  const room = await getRoom(code);
+  const player = await auth(room, creds);
+
+  const message = content.trim();
+
+  if (!message || message.length > 300) {
+    throw new ApiError(
+      400,
+      'Mesaj 1-300 karakter arasında olmalı'
+    );
+  }
+
+  if (message.includes('\u0000')) {
+    throw new ApiError(400, 'Geçersiz mesaj');
+  }
+
+  const latest = check<Row[]>(
+    await admin()
+      .from('room_messages')
+      .select('created_at')
+      .eq('room_id', room.id)
+      .eq('player_id', player.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+  );
+
+  if (
+    latest.length &&
+    Date.now() -
+      new Date(latest[0].created_at).getTime() < 2000
+  ) {
+    throw new ApiError(
+      429,
+      'Yeni mesaj göndermek için 2 saniye bekle'
+    );
+  }
+
+  const result = await admin()
+    .from('room_messages')
+    .insert({
+      room_id: room.id,
+      player_id: player.id,
+      content: message,
+    });
+
+  if (result.error) {
+    console.error('[chat]', result.error);
+    throw new ApiError(500, 'Mesaj gönderilemedi');
+  }
+}
