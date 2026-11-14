@@ -146,6 +146,11 @@ export default function House3D() {
       try {
         const supabase = browserSupabase();
 
+        // Supabase null kontrolü
+        if (!supabase) {
+          throw new Error('Supabase bağlantısı kurulamadı.');
+        }
+
         const { data: authData, error: authError } =
           await supabase.auth.getUser();
 
@@ -177,7 +182,7 @@ export default function House3D() {
 
         if (active) {
           setErrorMessage(
-            'Ev bilgileri alınamadı. Profil tablosunu kontrol et.'
+            'Ev bilgileri alınamadı. Supabase bağlantısını kontrol et.'
           );
         }
       } finally {
