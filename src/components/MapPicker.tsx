@@ -37,13 +37,18 @@ interface PlaceLabel {
   type?: 'country' | 'region' | 'city';
 }
 
-const pin = (color: string) =>
-  L.divIcon({
-    className: '',
-    html: `<div class="hagy-pin" style="background:${color}"></div>`,
-    iconSize: [22, 22],
-    iconAnchor: [11, 26],
+const pin = (color: string) => {
+  const safeColor = /^#[0-9a-fA-F]{3,8}$/.test(color)
+    ? color
+    : '#67e8f9';
+
+  return L.divIcon({
+    className: 'hagy-explorer-pin',
+    html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:${safeColor};border:3px solid #ffffff;box-shadow:0 3px 12px rgba(7,17,29,.55)"><span style="display:block;width:7px;height:7px;border-radius:50%;background:#07111d;transform:rotate(45deg)"></span></div>`,
+    iconSize: [28, 32],
+    iconAnchor: [14, 30],
   });
+};
 
 // Türkçe ülke, bölge ve şehir isimleri
 const PLACES: PlaceLabel[] = [
@@ -197,14 +202,13 @@ const PLACES: PlaceLabel[] = [
   { name: 'Los Angeles', lat: 34.0522, lng: -118.2437, type: 'city', minZoom: 5 },
 ];
 
-// Türkçe etiket ikonu
 function labelIcon(place: PlaceLabel) {
   const isCountry = !place.type || place.type === 'country';
   const isRegion = place.type === 'region';
 
   const fontSize = isCountry ? 12 : isRegion ? 11 : 10;
   const fontWeight = isCountry ? 800 : isRegion ? 700 : 600;
-  const color = isCountry ? '#172033' : isRegion ? '#334155' : '#1e40af';
+  const color = isCountry ? '#0f2535' : isRegion ? '#244357' : '#12667a';
 
   return L.divIcon({
     className: 'hagy-turkish-label',
@@ -227,7 +231,6 @@ function labelIcon(place: PlaceLabel) {
   });
 }
 
-// Yakınlaştırma seviyesine göre etiketleri göster
 function TurkishLabels() {
   const map = useMap();
 
@@ -252,12 +255,9 @@ function TurkishLabels() {
       for (const place of labels) {
         const isCountry = !place.type || place.type === 'country';
 
-        // Yakınlaştırıldığında ülke isimlerini gizle
         if (isCountry && zoom >= 6) continue;
-
         if (zoom < (place.minZoom ?? 0)) continue;
         if (zoom > (place.maxZoom ?? 19)) continue;
-
         if (!bounds.contains([place.lat, place.lng])) continue;
 
         L.marker([place.lat, place.lng], {
@@ -282,7 +282,6 @@ function TurkishLabels() {
   return null;
 }
 
-// Haritaya tıklayarak tahmin yap
 function Clicks({
   onPick,
 }: {
@@ -304,7 +303,6 @@ function Clicks({
   return null;
 }
 
-// Harita boyutunu güncelle
 function SizeWatcher() {
   const map = useMap();
 
@@ -321,7 +319,6 @@ function SizeWatcher() {
   return null;
 }
 
-// Sonuç ekranında konumları göster
 function Fit({ points }: { points: LatLng[] }) {
   const map = useMap();
 
@@ -358,7 +355,6 @@ function Fit({ points }: { points: LatLng[] }) {
   return null;
 }
 
-// Ana harita bileşeni
 export default function MapPicker({
   guess,
   onPick,
@@ -372,104 +368,134 @@ export default function MapPicker({
   ];
 
   return (
-    <MapContainer
-      center={[25, 10]}
-      zoom={2}
-      minZoom={2}
-      maxZoom={19}
-      zoomControl={false}
-      zoomAnimation
-      fadeAnimation
-      markerZoomAnimation
-      scrollWheelZoom
-      doubleClickZoom
-      worldCopyJump
-      maxBounds={[
-        [-85, -180],
-        [85, 180],
-      ]}
-      maxBoundsViscosity={1}
-      className={`h-full w-full ${
-        onPick ? 'picking' : ''
-      }`}
-    >
-      <TileLayer
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    <div className="hagy-explorer-map relative h-full w-full overflow-hidden bg-[#dceaf0]">
+      <MapContainer
+        center={[25, 10]}
+        zoom={2}
+        minZoom={2}
         maxZoom={19}
-        maxNativeZoom={19}
-        detectRetina
-        keepBuffer={4}
-        updateWhenIdle
-      />
-
-      <TurkishLabels />
-
-      <ZoomControl position="topright" />
-
-      <Clicks onPick={onPick} />
-
-      <SizeWatcher />
-
-      {actual && <Fit points={points} />}
-
-      {guess && (
-        <Marker
-          position={[guess.lat, guess.lng]}
-          icon={pin('#3b82f6')}
+        zoomControl={false}
+        zoomAnimation
+        fadeAnimation
+        markerZoomAnimation
+        scrollWheelZoom
+        doubleClickZoom
+        worldCopyJump
+        maxBounds={[
+          [-85, -180],
+          [85, 180],
+        ]}
+        maxBoundsViscosity={1}
+        className={`h-full w-full ${
+          onPick ? 'picking' : ''
+        }`}
+      >
+        <TileLayer
+          url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          maxZoom={19}
+          maxNativeZoom={19}
+          detectRetina
+          keepBuffer={4}
+          updateWhenIdle
         />
-      )}
 
-      {actual && (
-        <Marker
-          position={[actual.lat, actual.lng]}
-          icon={pin('#10b981')}
-        />
-      )}
+        <TurkishLabels />
 
-      {actual && guess && (
-        <Polyline
-          positions={[
-            [guess.lat, guess.lng],
-            [actual.lat, actual.lng],
-          ]}
-          pathOptions={{
-            color: '#3b82f6',
-            dashArray: '6 8',
-            weight: 3,
-          }}
-        />
-      )}
+        <ZoomControl position="topright" />
 
-      {actual &&
-        others.map((other, index) => (
+        <Clicks onPick={onPick} />
+
+        <SizeWatcher />
+
+        {actual && <Fit points={points} />}
+
+        {guess && (
           <Marker
-            key={`marker-${index}`}
-            position={[
-              other.pos.lat,
-              other.pos.lng,
-            ]}
-            icon={pin(other.color)}
-            title={other.label}
+            position={[guess.lat, guess.lng]}
+            icon={pin('#22d3ee')}
           />
-        ))}
+        )}
 
-      {actual &&
-        others.map((other, index) => (
+        {actual && (
+          <Marker
+            position={[actual.lat, actual.lng]}
+            icon={pin('#34d399')}
+          />
+        )}
+
+        {actual && guess && (
           <Polyline
-            key={`line-${index}`}
             positions={[
-              [other.pos.lat, other.pos.lng],
+              [guess.lat, guess.lng],
               [actual.lat, actual.lng],
             ]}
             pathOptions={{
-              color: other.color,
-              dashArray: '6 8',
-              weight: 2,
-              opacity: 0.8,
+              color: '#0891b2',
+              dashArray: '7 8',
+              weight: 3,
             }}
           />
-        ))}
-    </MapContainer>
+        )}
+
+        {actual &&
+          others.map((other, index) => (
+            <Marker
+              key={`marker-${index}`}
+              position={[
+                other.pos.lat,
+                other.pos.lng,
+              ]}
+              icon={pin(other.color)}
+              title={other.label}
+            />
+          ))}
+
+        {actual &&
+          others.map((other, index) => (
+            <Polyline
+              key={`line-${index}`}
+              positions={[
+                [other.pos.lat, other.pos.lng],
+                [actual.lat, actual.lng],
+              ]}
+              pathOptions={{
+                color: other.color,
+                dashArray: '6 8',
+                weight: 2,
+                opacity: 0.8,
+              }}
+            />
+          ))}
+      </MapContainer>
+
+      <style jsx global>{`
+        .hagy-explorer-map .leaflet-control-zoom {
+          border: 1px solid rgba(34, 211, 238, .35) !important;
+          border-radius: 13px !important;
+          overflow: hidden;
+          box-shadow: 0 8px 24px rgba(7, 17, 29, .25) !important;
+        }
+        .hagy-explorer-map .leaflet-control-zoom a {
+          width: 34px !important;
+          height: 34px !important;
+          line-height: 34px !important;
+          background: #071522 !important;
+          color: #a5f3fc !important;
+          border-bottom-color: rgba(255, 255, 255, .12) !important;
+        }
+        .hagy-explorer-map .leaflet-control-zoom a:hover {
+          background: #123047 !important;
+          color: white !important;
+        }
+        .hagy-explorer-map .leaflet-control-attribution {
+          background: rgba(255, 255, 255, .9) !important;
+          font-size: 10px !important;
+        }
+        .hagy-explorer-map .leaflet-container {
+          font-family: Arial, sans-serif;
+        }
+      `}</style>
+    </div>
   );
 }
