@@ -49,8 +49,6 @@ interface PoolRow {
   use_count?: number;
 }
 
-// CACHE
-
 const cache = new Map<string, {
   value: unknown;
   expires: number;
@@ -72,18 +70,18 @@ function cacheSet(
   ttl = CACHE_TTL
 ): void {
   if (cache.has(key)) cache.delete(key);
+
   while (cache.size >= MAX_CACHE_SIZE) {
     const first = cache.keys().next().value;
     if (first === undefined) break;
     cache.delete(first);
   }
+
   cache.set(key, {
     value,
     expires: Date.now() + ttl,
   });
 }
-
-// API CONCURRENCY
 
 let activeRequests = 0;
 const waiters: Array<() => void> = [];
@@ -112,8 +110,6 @@ function busy(seconds: number): ApiError {
   );
 }
 
-// MAPILLARY REQUEST + DIAGNOSTICS
-
 async function mly<T>(
   path: string,
   params: Record<string, string | number | boolean>
@@ -125,6 +121,7 @@ async function mly<T>(
   }
 
   const url = new URL(path, BASE);
+
   for (const [key, value] of Object.entries(params)) {
     url.searchParams.set(key, String(value));
   }
@@ -157,11 +154,13 @@ async function mly<T>(
         );
 
         blockedUntil = Date.now() + retryAfter * 1000;
+
         console.error('[Mapillary HTTP]', {
           path,
           status: 429,
           retryAfter,
         });
+
         throw busy(retryAfter);
       }
 
@@ -171,6 +170,7 @@ async function mly<T>(
           status: response.status,
           message: 'Token veya izin hatası',
         });
+
         throw new ApiError(
           500,
           'Mapillary API token geçersiz'
@@ -199,9 +199,6 @@ async function mly<T>(
         error: error instanceof Error
           ? error.message
           : String(error),
-        cause: error instanceof Error && 'cause' in error
-          ? String(error.cause)
-          : undefined,
         timedOut: controller.signal.aborted,
       });
 
@@ -216,8 +213,6 @@ async function mly<T>(
     release();
   }
 }
-
-// PARSE IMAGE
 
 function parse(raw: RawImage): LocationCandidate | null {
   const coordinates = (
@@ -270,8 +265,6 @@ function parse(raw: RawImage): LocationCandidate | null {
   };
 }
 
-// RANDOM SEEDS
-
 function regionKey(index: number): string {
   return `seed-${index}`;
 }
@@ -286,8 +279,6 @@ function shuffledSeedIndexes(): number[] {
 
   return indexes;
 }
-
-// SUPABASE POOL
 
 async function readPool(region: string): Promise<PoolRow[]> {
   const result = await admin()
@@ -335,8 +326,6 @@ async function savePool(
     console.error('Panorama kaydetme hatası:', result.error);
   }
 }
-
-// DISCOVER PANORAMAS
 
 async function discoverRegion(
   seedIndex: number
@@ -403,12 +392,11 @@ async function loadRegion(
   }
 }
 
-// RECENT LOCATIONS
-
 const recentIds = new Map<string, number>();
 
 function isRecent(id: string): boolean {
   const usedAt = recentIds.get(id);
+
   return (
     usedAt !== undefined &&
     Date.now() - usedAt < RECENT_TTL
@@ -457,8 +445,6 @@ function randomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-// PICK FROM REGION
-
 async function pickFromRegion(
   seedIndex: number,
   selected: LocationCandidate[]
@@ -495,7 +481,7 @@ async function pickFromRegion(
           },
         };
       } catch {
-        // Try next panorama
+        // Sonraki panoramayı dene.
       }
     }
   }
@@ -511,24 +497,141 @@ async function pickFromRegion(
 }
 
 // SINGLE PLAYER
+// Önce Supabase havuzundan seçim yap.
 
 export async function pickRandomLocation(): Promise<{
   image: RoundImage;
   location: LatLng;
 }> {
-  const indexes = shuffledSeedIndexes();
+  const { data, error } = await admin()
+    .from('panorama_pool')
+    .select(
+      'image_id,sequence_id,lat,lng,region,last_used_at,use_count'
+    )
+    .order('last_used_at', {
+      ascending: true,
+      nullsFirst: true,
+    })
+    .limit(3000);
 
-  for (const index of indexes.slice(0, 12)) {
+  if (error) {
+    console.error(
+      'Panorama havuzu okunamadı:',
+      error.message
+    );
+  }
+
+  const rows = (data ?? []) as PoolRow[];
+  const now = Date.now();
+
+  const recentlyUsed = (row: PoolRow) =>
+    isRecent(row.image_id) ||
+    (
+      row.last_used_at !== null &&
+      row.last_used_at !== undefined &&
+      now - new Date(row.last_used_at).getTime() < RECENT_TTL
+    );
+
+  const available = rows.filter(
+    row => !recentlyUsed(row)
+  );
+
+  const pool = available.length
+    ? available
+    : rows;
+
+  const byRegion = new Map<string, PoolRow[]>();
+
+  for (const row of pool) {
+    if (
+      !Number.isFinite(row.lat) ||
+      !Number.isFinite(row.lng)
+    ) continue;
+
+    const key = row.region ?? 'unknown';
+    const group = byRegion.get(key) ?? [];
+
+    group.push(row);
+    byRegion.set(key, group);
+  }
+
+  const regions = [...byRegion.keys()];
+
+  for (let i = regions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [regions[i], regions[j]] = [
+      regions[j],
+      regions[i],
+    ];
+  }
+
+  const choices: PoolRow[] = [];
+
+  for (const region of regions) {
+    const group = byRegion.get(region)!;
+
+    group.sort(
+      (a, b) =>
+        (a.use_count ?? 0) -
+        (b.use_count ?? 0)
+    );
+
+    choices.push(
+      randomItem(
+        group.slice(
+          0,
+          Math.min(group.length, 25)
+        )
+      )
+    );
+  }
+
+  for (const row of choices.slice(0, 5)) {
     try {
-      const candidate = await pickFromRegion(index, []);
+      const image = await getImageById(
+        row.image_id
+      );
 
-      if (candidate) {
-        rememberUsed(candidate.image.imageId);
-        return candidate;
-      }
+      rememberUsed(image.imageId);
+
+      return {
+        image,
+        location: {
+          lat: row.lat,
+          lng: row.lng,
+        },
+      };
     } catch (error) {
-      console.error('Bölge seçilemedi:', index, error);
+      console.error(
+        'Havuz panoraması alınamadı:',
+        row.image_id,
+        error
+      );
     }
+  }
+
+  // Havuzdan sonuç çıkmazsa yeni panorama ara.
+  const indexes = shuffledSeedIndexes().slice(0, 4);
+
+  const discovered = await Promise.allSettled(
+    indexes.map(index => loadRegion(index))
+  );
+
+  const candidates = discovered
+    .flatMap(result =>
+      result.status === 'fulfilled'
+        ? result.value
+        : []
+    )
+    .filter(
+      item => !isRecent(item.image.imageId)
+    );
+
+  if (candidates.length) {
+    const candidate = randomItem(candidates);
+
+    rememberUsed(candidate.image.imageId);
+    return candidate;
   }
 
   throw new ApiError(
@@ -548,7 +651,10 @@ export async function pickGameLocations(
     count < 1 ||
     count > 20
   ) {
-    throw new ApiError(400, 'Geçersiz tur sayısı');
+    throw new ApiError(
+      400,
+      'Geçersiz tur sayısı'
+    );
   }
 
   const selected: LocationCandidate[] = [];
@@ -565,11 +671,14 @@ export async function pickGameLocations(
     );
 
     const results = await Promise.allSettled(
-      group.map(index => pickFromRegion(index, selected))
+      group.map(index =>
+        pickFromRegion(index, selected)
+      )
     );
 
     for (const result of results) {
       if (selected.length >= count) break;
+
       if (
         result.status !== 'fulfilled' ||
         !result.value
@@ -577,7 +686,12 @@ export async function pickGameLocations(
 
       const candidate = result.value;
 
-      if (sufficientlyDifferent(candidate, selected)) {
+      if (
+        sufficientlyDifferent(
+          candidate,
+          selected
+        )
+      ) {
         selected.push(candidate);
         rememberUsed(candidate.image.imageId);
       }
@@ -605,7 +719,10 @@ const pendingImages = new Map<
 export async function getImageById(
   id: string
 ): Promise<RoundImage> {
-  const cached = cacheGet<RoundImage>(`img:${id}`);
+  const cached = cacheGet<RoundImage>(
+    `img:${id}`
+  );
+
   if (cached) return cached;
 
   const existing = pendingImages.get(id);
@@ -650,10 +767,14 @@ async function sequenceIds(
   sequenceId: string
 ): Promise<string[]> {
   const key = `seq:${sequenceId}`;
+
   const cached = cacheGet<string[]>(key);
   if (cached) return cached;
 
-  const existing = pendingSequences.get(sequenceId);
+  const existing = pendingSequences.get(
+    sequenceId
+  );
+
   if (existing) return existing;
 
   const request = (async () => {
@@ -663,12 +784,17 @@ async function sequenceIds(
       sequence_id: sequenceId,
     });
 
-    const ids = (response.data ?? []).map(item => item.id);
+    const ids = (response.data ?? [])
+      .map(item => item.id);
+
     cacheSet(key, ids);
     return ids;
   })();
 
-  pendingSequences.set(sequenceId, request);
+  pendingSequences.set(
+    sequenceId,
+    request
+  );
 
   try {
     return await request;
@@ -695,7 +821,11 @@ export async function moveAlong(
   }
 
   const targetIndex =
-    index + (direction === 'next' ? MOVE_STEP : -MOVE_STEP);
+    index + (
+      direction === 'next'
+        ? MOVE_STEP
+        : -MOVE_STEP
+    );
 
   if (
     targetIndex < 0 ||
@@ -707,7 +837,9 @@ export async function moveAlong(
     );
   }
 
-  return getImageById(ids[targetIndex]);
+  return getImageById(
+    ids[targetIndex]
+  );
 }
 
 // REFILL PANORAMA POOL
@@ -725,10 +857,13 @@ export async function refillPanoramaPool(
     Math.max(1, Math.floor(count || 3))
   );
 
-  const indexes = shuffledSeedIndexes().slice(0, target);
+  const indexes = shuffledSeedIndexes()
+    .slice(0, target);
 
   const results = await Promise.allSettled(
-    indexes.map(index => loadRegion(index))
+    indexes.map(index =>
+      loadRegion(index)
+    )
   );
 
   let panoramasFound = 0;
