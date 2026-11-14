@@ -1,41 +1,38 @@
 
-import Link from 'next/link';
+import Link from "next/link";
 
 const features = [
   {
-    number: '01',
-    icon: '◎',
-    title: 'Çevreni incele',
-    description:
-      'Sokakları, yapıları, tabelaları ve doğayı keşfet.',
+    number: "01",
+    icon: "◎",
+    title: "Çevreni incele",
+    description: "Sokakları, yapıları, tabelaları ve doğayı keşfet.",
   },
   {
-    number: '02',
-    icon: '⌖',
-    title: 'İpuçlarını birleştir',
-    description:
-      'Gördüklerinden yola çıkarak nerede olduğunu düşün.',
+    number: "02",
+    icon: "⌖",
+    title: "İpuçlarını birleştir",
+    description: "Gördüklerinden yola çıkarak nerede olduğunu düşün.",
   },
   {
-    number: '03',
-    icon: '↗',
-    title: 'Konumu işaretle',
-    description:
-      'Haritada tahminini yap ve ne kadar yaklaştığını gör.',
+    number: "03",
+    icon: "↗",
+    title: "Konumu işaretle",
+    description: "Haritada tahminini yap ve ne kadar yaklaştığını gör.",
   },
 ];
 
 function BrandMark({ large = false }: { large?: boolean }) {
   return (
     <div
-      className={`relative flex shrink-0 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 ${
-        large ? 'h-20 w-20' : 'h-11 w-11'
+      className={`flex shrink-0 items-center justify-center rounded-2xl border border-cyan-300/30 bg-cyan-300/10 ${
+        large ? "h-20 w-20" : "h-11 w-11"
       }`}
     >
       <svg
         viewBox="0 0 64 64"
         fill="none"
-        className={large ? 'h-14 w-14' : 'h-8 w-8'}
+        className={large ? "h-14 w-14" : "h-8 w-8"}
         aria-hidden="true"
       >
         <circle
@@ -62,7 +59,7 @@ function BrandMark({ large = false }: { large?: boolean }) {
 
 export default function Home() {
   return (
-    <main className="relative isolate min-h-dvh overflow-hidden bg-[#07111d] text-white">
+    <main className="relative isolate min-h-screen overflow-hidden bg-[#07111d] text-white">
       {/* Arka plan */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-48 top-24 h-[520px] w-[520px] rounded-full bg-cyan-500/10 blur-[120px]" />
@@ -72,8 +69,8 @@ export default function Home() {
           className="absolute inset-0 opacity-[0.035]"
           style={{
             backgroundImage:
-              'linear-gradient(#ffffff 1px,transparent 1px),linear-gradient(90deg,#ffffff 1px,transparent 1px)',
-            backgroundSize: '56px 56px',
+              "linear-gradient(#ffffff 1px,transparent 1px),linear-gradient(90deg,#ffffff 1px,transparent 1px)",
+            backgroundSize: "56px 56px",
           }}
         />
       </div>
@@ -94,16 +91,22 @@ export default function Home() {
 
         <nav className="flex items-center gap-2">
           <Link
-            href="/login"
+            href="/auth"
             className="rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-slate-200 transition hover:bg-white/10 sm:px-5 sm:text-sm"
           >
             Giriş Yap
           </Link>
           <Link
-            href="/register"
+            href="/auth"
             className="rounded-xl bg-cyan-300 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200 sm:px-5 sm:text-sm"
           >
             Kayıt Ol
+          </Link>
+          <Link
+            href="/profile"
+            className="hidden rounded-xl border border-cyan-300/30 px-4 py-2.5 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/10 md:inline-flex"
+          >
+            Profilim
           </Link>
         </nav>
       </header>
@@ -147,9 +150,9 @@ export default function Home() {
 
           <div className="mt-9 flex flex-wrap gap-2">
             {[
-              'Ücretsiz',
-              'Dünya çapında',
-              'Tekli ve çoklu oyun',
+              "Ücretsiz",
+              "Dünya çapında",
+              "Tekli ve çoklu oyun",
             ].map((item) => (
               <span
                 key={item}
@@ -161,7 +164,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Özgün keşif paneli */}
+        {/* Keşif paneli */}
         <div className="relative mx-auto w-full max-w-lg">
           <div className="absolute -inset-5 rounded-[40px] bg-cyan-400/10 blur-3xl" />
 
@@ -242,9 +245,9 @@ export default function Home() {
 
             <div className="mt-5 grid grid-cols-3 gap-3">
               {[
-                ['01', 'GÖZLE'],
-                ['02', 'KEŞFET'],
-                ['03', 'TAHMİN ET'],
+                ["01", "GÖZLE"],
+                ["02", "KEŞFET"],
+                ["03", "TAHMİN ET"],
               ].map(([number, title]) => (
                 <div
                   key={number}
@@ -296,10 +299,7 @@ export default function Home() {
               Kendi keşif yolculuğuna çık.
             </p>
             <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5 font-bold text-cyan-200">
-              Oyuna Gir
-              <span className="text-xl transition group-hover:translate-x-1">
-                ↗
-              </span>
+              Oyuna Gir <span className="text-xl">↗</span>
             </div>
           </Link>
 
@@ -321,10 +321,7 @@ export default function Home() {
               en iyi konum tahminini yap.
             </p>
             <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-5 font-bold text-blue-200">
-              Oda Kur veya Katıl
-              <span className="text-xl transition group-hover:translate-x-1">
-                ↗
-              </span>
+              Oda Kur veya Katıl <span className="text-xl">↗</span>
             </div>
           </Link>
         </div>
@@ -366,7 +363,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Alt çağrı */}
+      {/* Alt bölüm */}
       <section className="relative z-10 mx-auto max-w-5xl px-5 py-20 text-center">
         <div className="rounded-[30px] border border-cyan-300/20 bg-cyan-300/[0.055] px-6 py-12 sm:px-12">
           <p className="text-xs font-bold tracking-[0.25em] text-cyan-300">
@@ -388,20 +385,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Kaynaklar */}
+      {/* Alt bilgi */}
       <footer className="relative z-10 border-t border-white/10 px-5 py-8 sm:px-8">
         <div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 text-xs text-slate-400 md:flex-row">
           <div>
             <div className="font-black text-white">
               HAGY <span className="text-cyan-300">GUESS</span>
             </div>
-            <p className="mt-2">
-              Bağımsız dünya keşif oyunu.
-            </p>
+            <p className="mt-2">Bağımsız dünya keşif oyunu.</p>
           </div>
 
           <div className="max-w-xl leading-6">
-            Sokak görüntüleri:{' '}
+            Sokak görüntüleri:{" "}
             <a
               href="https://www.mapillary.com"
               target="_blank"
@@ -409,8 +404,8 @@ export default function Home() {
               className="underline hover:text-white"
             >
               Mapillary
-            </a>
-            {' '}katkıcıları ·{' '}
+            </a>{" "}
+            katkıcıları ·{" "}
             <a
               href="https://creativecommons.org/licenses/by-sa/4.0/"
               target="_blank"
@@ -419,7 +414,7 @@ export default function Home() {
             >
               CC BY-SA 4.0
             </a>
-            . Harita verileri:{' '}
+            . Harita verileri:{" "}
             <a
               href="https://www.openstreetmap.org/copyright"
               target="_blank"
