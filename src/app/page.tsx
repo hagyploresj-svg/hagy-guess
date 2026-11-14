@@ -1,5 +1,6 @@
 
 import Link from "next/link";
+import AuthNav from "@/components/AuthNav";
 
 const features = [
   {
@@ -89,26 +90,8 @@ export default function Home() {
           </div>
         </Link>
 
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/auth"
-            className="rounded-xl border border-white/15 px-3 py-2.5 text-xs font-bold text-slate-200 transition hover:bg-white/10 sm:px-5 sm:text-sm"
-          >
-            Giriş Yap
-          </Link>
-          <Link
-            href="/auth"
-            className="rounded-xl bg-cyan-300 px-3 py-2.5 text-xs font-black text-slate-950 transition hover:bg-cyan-200 sm:px-5 sm:text-sm"
-          >
-            Kayıt Ol
-          </Link>
-          <Link
-            href="/profile"
-            className="hidden rounded-xl border border-cyan-300/30 px-4 py-2.5 text-sm font-bold text-cyan-200 transition hover:bg-cyan-300/10 md:inline-flex"
-          >
-            Profilim
-          </Link>
-        </nav>
+        {/* Oturum durumuna göre değişen hesap menüsü */}
+        <AuthNav />
       </header>
 
       {/* Ana bölüm */}
@@ -256,7 +239,7 @@ export default function Home() {
                   <div className="text-lg font-black text-cyan-300">
                     {number}
                   </div>
-                  <div className="mt-1 text-[10px] font-bold tracking-wide text-slate-400">
+                  <div className="mt-1 text-[10px] font-bold text-slate-400">
                     {title}
                   </div>
                 </div>
