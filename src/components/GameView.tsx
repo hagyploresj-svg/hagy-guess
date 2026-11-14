@@ -61,6 +61,7 @@ export default function GameView({
 }: Props) {
   const [current, setCurrent] = useState(image);
   const [moving, setMoving] = useState(false);
+
   const [blocked, setBlocked] = useState<{
     next?: boolean;
     prev?: boolean;
@@ -81,12 +82,12 @@ export default function GameView({
     new Map<string, RoundImage>()
   );
 
-  // Aynı isteği tekrar göndermeyi önler
+  // Aynı isteğin tekrar gönderilmesini önler
   const pending = useRef(
     new Map<string, Promise<RoundImage>>()
   );
 
-  // Önceden yüklenmiş resimleri bellekte tut
+  // Görüntüleri tarayıcı belleğinde tut
   const preloadedImages = useRef(
     new Map<string, HTMLImageElement>()
   );
@@ -180,9 +181,10 @@ export default function GameView({
     []
   );
 
-  // Yeni tur geldiğinde eski tur önbelleğini temizle
+  // Yeni tur geldiğinde eski tur verilerini temizle
   useEffect(() => {
     generation.current++;
+
     neighborCache.current.clear();
     pending.current.clear();
     preloadedImages.current.clear();
@@ -198,7 +200,7 @@ export default function GameView({
     setOpen(false);
   }, [image.imageId]);
 
-  // Her görüntü değiştiğinde iki yönü önceden hazırla
+  // İleri ve geri görüntülerini önceden yükle
   useEffect(() => {
     if (!current.sequenceId || locked) return;
 
@@ -221,8 +223,8 @@ export default function GameView({
 
         preloadImage(neighbor);
       } catch {
-        // Ön yükleme başarısızsa normal hareket
-        // sırasında yeniden denenebilir.
+        // Ön yükleme başarısız olursa
+        // normal hareket sırasında tekrar denenir.
       }
     };
 
@@ -240,6 +242,7 @@ export default function GameView({
     preloadImage,
   ]);
 
+  // İleri / geri hareket
   const move = async (dir: Direction) => {
     const from = currentRef.current;
 
@@ -265,7 +268,7 @@ export default function GameView({
 
       if (version !== generation.current) return;
 
-      // Geri dönüşü anında mümkün kıl
+      // Geri dönüşü hızlı yapabilmek için
       neighborCache.current.set(
         keyFor(next, opposite(dir)),
         from
@@ -274,7 +277,7 @@ export default function GameView({
       currentRef.current = next;
       setCurrent(next);
       setBlocked({});
-    } catch (error) {
+    } catch {
       if (version !== generation.current) return;
 
       setBlocked((previous) => ({
@@ -289,6 +292,7 @@ export default function GameView({
     }
   };
 
+  // Tahmini gönder
   const submit = useCallback(async () => {
     const selected = guessRef.current;
 
@@ -309,6 +313,7 @@ export default function GameView({
   const submitRef = useRef(submit);
   submitRef.current = submit;
 
+  // Süre dolunca seçilmiş tahmini gönder
   useEffect(() => {
     if (!deadline || locked) return;
 
@@ -324,40 +329,69 @@ export default function GameView({
   const canMove =
     !!current.sequenceId && !locked;
 
+  // Mobil için büyük dokunmatik butonlar
   const arrow =
-    'pointer-events-auto flex h-11 min-w-24 items-center justify-center rounded-full bg-black/60 px-4 text-sm font-semibold text-white backdrop-blur transition hover:bg-black/80 disabled:opacity-30';
+    'pointer-events-auto flex h-14 w-14 touch-manipulation select-none items-center justify-center rounded-2xl border border-white/20 bg-slate-950/75 text-white shadow-xl backdrop-blur-md transition active:scale-95 active:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 sm:h-12 sm:w-20 sm:text-sm';
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-black">
+
+      {/* Sokak görüntüsü */}
       <div className="absolute inset-0">
         <StreetViewer image={current} />
       </div>
 
+      {/* Üst bilgi alanı */}
       <div className="pointer-events-none absolute left-3 top-3 z-[1100] flex items-center gap-3 rounded-xl bg-black/60 px-4 py-2 text-sm font-semibold backdrop-blur">
         {hud}
       </div>
 
+      {/* MOBİL İLERİ / GERİ KONTROLLERİ */}
       {canMove && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 z-[1100] flex -translate-x-1/2 gap-3">
-          <button
-            className={arrow}
-            disabled={moving || !!blocked.prev}
-            onClick={() => void move('prev')}
-          >
-            ▼ Geri
-          </button>
+        <div className="pointer-events-none absolute right-3 top-1/2 z-[1100] flex -translate-y-1/2 flex-col items-center gap-3 sm:right-5">
 
           <button
+            type="button"
             className={arrow}
+            aria-label="İleri git"
+            title="İleri git"
             disabled={moving || !!blocked.next}
             onClick={() => void move('next')}
           >
-            ▲ İleri
+            <span className="flex flex-col items-center leading-tight">
+              <span className="text-2xl sm:text-xl">
+                ▲
+              </span>
+              <span className="text-[10px]">
+                İleri
+              </span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={arrow}
+            aria-label="Geri git"
+            title="Geri git"
+            disabled={moving || !!blocked.prev}
+            onClick={() => void move('prev')}
+          >
+            <span className="flex flex-col items-center leading-tight">
+              <span className="text-2xl sm:text-xl">
+                ▼
+              </span>
+              <span className="text-[10px]">
+                Geri
+              </span>
+            </span>
           </button>
 
           {current.imageId !== image.imageId && (
             <button
+              type="button"
               className={arrow}
+              aria-label="Başlangıç konumuna dön"
+              title="Başa dön"
               disabled={moving}
               onClick={() => {
                 currentRef.current = image;
@@ -365,22 +399,32 @@ export default function GameView({
                 setBlocked({});
               }}
             >
-              ⟲ Başa dön
+              <span className="flex flex-col items-center leading-tight">
+                <span className="text-2xl sm:text-xl">
+                  ↺
+                </span>
+                <span className="text-[10px]">
+                  Başa
+                </span>
+              </span>
             </button>
           )}
         </div>
       )}
 
+      {/* Hareket yüklenme bildirimi */}
       {moving && (
         <div className="pointer-events-none absolute left-1/2 top-20 z-[1100] -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs text-white backdrop-blur">
           Görüntü hazırlanıyor…
         </div>
       )}
 
+      {/* Mapillary lisans ve kaynak bilgisi */}
       <div className="pointer-events-none absolute bottom-2 left-2 z-[1100]">
         <Attribution image={current} />
       </div>
 
+      {/* Tahmin haritası */}
       <div
         className={`absolute bottom-4 right-3 z-[1100] flex flex-col gap-2 transition-[width] duration-200 ${
           open
@@ -405,8 +449,10 @@ export default function GameView({
           />
 
           <button
+            type="button"
             onClick={() => setOpen((value) => !value)}
             className="absolute right-2 top-2 z-[1200] rounded bg-black/60 px-2 py-1 text-xs sm:hidden"
+            aria-label="Haritayı büyüt veya küçült"
           >
             ⤢
           </button>
@@ -424,6 +470,7 @@ export default function GameView({
           </div>
         ) : (
           <button
+            type="button"
             onClick={() => void submit()}
             disabled={!guess || busy}
             className="rounded-xl bg-brand py-3 font-bold text-slate-950 transition enabled:hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-400"
