@@ -401,7 +401,8 @@ export default function GameView({
 
       {/* Keşif kontrol paneli */}
       {canMove && (
-        <div className="pointer-events-none absolute right-3 top-1/2 z-[1100] flex -translate-y-1/2 flex-col items-center gap-2 sm:right-5">
+     
+<div className="pointer-events-none absolute right-3 top-24 z-[1100] flex flex-col items-center gap-2 sm:right-5 sm:top-1/2 sm:-translate-y-1/2">
           <div className="mb-1 rounded-full border border-cyan-300/20 bg-[#071522]/85 px-3 py-1.5 text-[9px] font-black tracking-widest text-cyan-200 backdrop-blur">
             KEŞİF
           </div>
