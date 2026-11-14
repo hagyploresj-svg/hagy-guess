@@ -19,7 +19,7 @@ const StreetViewer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full w-full bg-black" />
+      <div className="h-full w-full bg-[#07111d]" />
     ),
   }
 );
@@ -29,7 +29,7 @@ const MapPicker = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-full w-full bg-slate-900" />
+      <div className="h-full w-full bg-[#0d1b2a]" />
     ),
   }
 );
@@ -50,6 +50,55 @@ function opposite(dir: Direction): Direction {
   return dir === 'next' ? 'prev' : 'next';
 }
 
+function ControlIcon({
+  name,
+}: {
+  name: 'forward' | 'back' | 'reset';
+}) {
+  if (name === 'reset') {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className="h-6 w-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M3 11a9 9 0 1 1 2.5 6.2" />
+        <path d="M3 4v7h7" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      className="h-6 w-6"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {name === 'forward' ? (
+        <>
+          <path d="m6 15 6-6 6 6" />
+          <path d="M12 9v11" />
+        </>
+      ) : (
+        <>
+          <path d="m6 9 6 6 6-6" />
+          <path d="M12 4v11" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export default function GameView({
   image,
   hud,
@@ -61,7 +110,6 @@ export default function GameView({
 }: Props) {
   const [current, setCurrent] = useState(image);
   const [moving, setMoving] = useState(false);
-
   const [blocked, setBlocked] = useState<{
     next?: boolean;
     prev?: boolean;
@@ -76,23 +124,19 @@ export default function GameView({
   currentRef.current = current;
 
   const movingRef = useRef(false);
+  const generation = useRef(0);
 
-  // Önceden getirilen komşu görüntüler
   const neighborCache = useRef(
     new Map<string, RoundImage>()
   );
 
-  // Aynı isteğin tekrar gönderilmesini önler
   const pending = useRef(
     new Map<string, Promise<RoundImage>>()
   );
 
-  // Görüntüleri tarayıcı belleğinde tut
   const preloadedImages = useRef(
     new Map<string, HTMLImageElement>()
   );
-
-  const generation = useRef(0);
 
   const guessRef = useRef(guess);
   guessRef.current = guess;
@@ -104,9 +148,7 @@ export default function GameView({
 
   const preloadImage = useCallback(
     (img: RoundImage) => {
-      if (
-        preloadedImages.current.has(img.imageId)
-      ) {
+      if (preloadedImages.current.has(img.imageId)) {
         return;
       }
 
@@ -137,7 +179,6 @@ export default function GameView({
       dir: Direction
     ): Promise<RoundImage> => {
       const key = keyFor(img, dir);
-
       const cached = neighborCache.current.get(key);
 
       if (cached) {
@@ -165,7 +206,6 @@ export default function GameView({
           key,
           response.image
         );
-
         return response.image;
       });
 
@@ -181,10 +221,9 @@ export default function GameView({
     []
   );
 
-  // Yeni tur geldiğinde eski tur verilerini temizle
+  // Yeni tur
   useEffect(() => {
     generation.current++;
-
     neighborCache.current.clear();
     pending.current.clear();
     preloadedImages.current.clear();
@@ -200,7 +239,7 @@ export default function GameView({
     setOpen(false);
   }, [image.imageId]);
 
-  // İleri ve geri görüntülerini önceden yükle
+  // Komşu görüntüleri önceden hazırla
   useEffect(() => {
     if (!current.sequenceId || locked) return;
 
@@ -223,8 +262,7 @@ export default function GameView({
 
         preloadImage(neighbor);
       } catch {
-        // Ön yükleme başarısız olursa
-        // normal hareket sırasında tekrar denenir.
+        // Normal hareket sırasında tekrar denenebilir.
       }
     };
 
@@ -242,7 +280,6 @@ export default function GameView({
     preloadImage,
   ]);
 
-  // İleri / geri hareket
   const move = async (dir: Direction) => {
     const from = currentRef.current;
 
@@ -261,14 +298,10 @@ export default function GameView({
     const version = generation.current;
 
     try {
-      const next = await fetchNeighbor(
-        from,
-        dir
-      );
+      const next = await fetchNeighbor(from, dir);
 
       if (version !== generation.current) return;
 
-      // Geri dönüşü hızlı yapabilmek için
       neighborCache.current.set(
         keyFor(next, opposite(dir)),
         from
@@ -292,7 +325,14 @@ export default function GameView({
     }
   };
 
-  // Tahmini gönder
+  const resetPosition = () => {
+    if (movingRef.current) return;
+
+    currentRef.current = image;
+    setCurrent(image);
+    setBlocked({});
+  };
+
   const submit = useCallback(async () => {
     const selected = guessRef.current;
 
@@ -313,7 +353,6 @@ export default function GameView({
   const submitRef = useRef(submit);
   submitRef.current = submit;
 
-  // Süre dolunca seçilmiş tahmini gönder
   useEffect(() => {
     if (!deadline || locked) return;
 
@@ -326,105 +365,109 @@ export default function GameView({
     return () => clearTimeout(timer);
   }, [deadline, locked, getNow]);
 
-  const canMove =
-    !!current.sequenceId && !locked;
+  const canMove = !!current.sequenceId && !locked;
 
-  // Mobil için büyük dokunmatik butonlar
-  const arrow =
-    'pointer-events-auto flex h-14 w-14 touch-manipulation select-none items-center justify-center rounded-2xl border border-white/20 bg-slate-950/75 text-white shadow-xl backdrop-blur-md transition active:scale-95 active:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 sm:h-12 sm:w-20 sm:text-sm';
+  const controlClass =
+    'pointer-events-auto flex h-14 w-14 touch-manipulation flex-col items-center justify-center gap-0.5 rounded-2xl border border-cyan-200/25 bg-[#071522]/85 text-cyan-100 shadow-xl backdrop-blur-xl transition hover:border-cyan-300/60 hover:bg-[#123047] active:scale-95 disabled:cursor-not-allowed disabled:opacity-30 sm:h-16 sm:w-16';
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden bg-black">
-
+    <div className="relative h-dvh w-full overflow-hidden bg-[#07111d] text-white">
       {/* Sokak görüntüsü */}
       <div className="absolute inset-0">
         <StreetViewer image={current} />
       </div>
 
-      {/* Üst bilgi alanı */}
-      <div className="pointer-events-none absolute left-3 top-3 z-[1100] flex items-center gap-3 rounded-xl bg-black/60 px-4 py-2 text-sm font-semibold backdrop-blur">
-        {hud}
+      {/* Üst HAGY paneli */}
+      <div className="pointer-events-none absolute left-3 right-3 top-3 z-[1100] flex flex-wrap items-start justify-between gap-2 sm:left-5 sm:right-5 sm:top-5">
+        <div className="pointer-events-none flex max-w-full items-center gap-3 rounded-2xl border border-cyan-300/20 bg-[#071522]/85 px-3 py-2.5 shadow-xl backdrop-blur-xl sm:px-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-300/10 text-xl font-black text-cyan-300">
+            ◈
+          </div>
+
+          <div className="min-w-0">
+            <div className="text-[10px] font-black tracking-[0.16em] text-cyan-300">
+              HAGY EXPLORER
+            </div>
+            <div className="mt-1 text-xs font-semibold text-slate-100 sm:text-sm">
+              {hud}
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden rounded-full border border-cyan-300/20 bg-[#071522]/80 px-4 py-2 text-[10px] font-bold tracking-[0.18em] text-cyan-200 backdrop-blur-xl sm:block">
+          DISCOVER THE UNKNOWN
+        </div>
       </div>
 
-      {/* MOBİL İLERİ / GERİ KONTROLLERİ */}
+      {/* Keşif kontrol paneli */}
       {canMove && (
-        <div className="pointer-events-none absolute right-3 top-1/2 z-[1100] flex -translate-y-1/2 flex-col items-center gap-3 sm:right-5">
+        <div className="pointer-events-none absolute right-3 top-1/2 z-[1100] flex -translate-y-1/2 flex-col items-center gap-2 sm:right-5">
+          <div className="mb-1 rounded-full border border-cyan-300/20 bg-[#071522]/85 px-3 py-1.5 text-[9px] font-black tracking-widest text-cyan-200 backdrop-blur">
+            KEŞİF
+          </div>
 
           <button
             type="button"
-            className={arrow}
+            className={controlClass}
             aria-label="İleri git"
             title="İleri git"
             disabled={moving || !!blocked.next}
             onClick={() => void move('next')}
           >
-            <span className="flex flex-col items-center leading-tight">
-              <span className="text-2xl sm:text-xl">
-                ▲
-              </span>
-              <span className="text-[10px]">
-                İleri
-              </span>
+            <ControlIcon name="forward" />
+            <span className="text-[10px] font-bold">
+              İleri
             </span>
           </button>
 
           <button
             type="button"
-            className={arrow}
+            className={controlClass}
             aria-label="Geri git"
             title="Geri git"
             disabled={moving || !!blocked.prev}
             onClick={() => void move('prev')}
           >
-            <span className="flex flex-col items-center leading-tight">
-              <span className="text-2xl sm:text-xl">
-                ▼
-              </span>
-              <span className="text-[10px]">
-                Geri
-              </span>
+            <ControlIcon name="back" />
+            <span className="text-[10px] font-bold">
+              Geri
             </span>
           </button>
 
           {current.imageId !== image.imageId && (
             <button
               type="button"
-              className={arrow}
+              className={controlClass}
               aria-label="Başlangıç konumuna dön"
               title="Başa dön"
               disabled={moving}
-              onClick={() => {
-                currentRef.current = image;
-                setCurrent(image);
-                setBlocked({});
-              }}
+              onClick={resetPosition}
             >
-              <span className="flex flex-col items-center leading-tight">
-                <span className="text-2xl sm:text-xl">
-                  ↺
-                </span>
-                <span className="text-[10px]">
-                  Başa
-                </span>
+              <ControlIcon name="reset" />
+              <span className="text-[10px] font-bold">
+                Başa
               </span>
             </button>
           )}
         </div>
       )}
 
-      {/* Hareket yüklenme bildirimi */}
+      {/* Hareket durumu */}
       {moving && (
-        <div className="pointer-events-none absolute left-1/2 top-20 z-[1100] -translate-x-1/2 rounded-full bg-black/60 px-4 py-2 text-xs text-white backdrop-blur">
-          Görüntü hazırlanıyor…
+        <div
+          role="status"
+          className="pointer-events-none absolute left-1/2 top-24 z-[1100] -translate-x-1/2 rounded-full border border-cyan-300/20 bg-[#071522]/90 px-4 py-2 text-xs font-semibold text-cyan-100 shadow-xl backdrop-blur"
+        >
+          Yeni görüntü hazırlanıyor…
         </div>
       )}
 
-      {/* Mapillary lisans ve kaynak bilgisi */}
+      {/* Kaynak gösterimi */}
       <div className="pointer-events-none absolute bottom-2 left-2 z-[1100]">
         <Attribution image={current} />
       </div>
 
-      {/* Tahmin haritası */}
+      {/* Tahmin terminali */}
       <div
         className={`absolute bottom-4 right-3 z-[1100] flex flex-col gap-2 transition-[width] duration-200 ${
           open
@@ -434,8 +477,36 @@ export default function GameView({
         onMouseEnter={() => setOpen(true)}
         onMouseLeave={() => setOpen(false)}
       >
+        <div className="flex items-center justify-between rounded-xl border border-cyan-300/20 bg-[#071522]/90 px-3 py-2 shadow-lg backdrop-blur-xl">
+          <div className="flex items-center gap-2">
+            <span className="text-lg text-cyan-300">
+              ⌖
+            </span>
+            <div>
+              <div className="text-[10px] font-black tracking-widest text-cyan-200">
+                KONUM TERMİNALİ
+              </div>
+              <div className="text-[10px] text-slate-400">
+                Haritada tahminini işaretle
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="touch-manipulation rounded-lg border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/20"
+            aria-label={
+              open ? 'Haritayı küçült' : 'Haritayı büyüt'
+            }
+            aria-expanded={open}
+          >
+            {open ? 'Küçült' : 'Büyüt'}
+          </button>
+        </div>
+
         <div
-          className={`relative overflow-hidden rounded-xl border border-slate-600 shadow-2xl transition-[height] duration-200 ${
+          className={`relative overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#0d1b2a] shadow-2xl transition-[height] duration-200 ${
             open
               ? 'h-[min(58vh,520px)]'
               : 'h-44'
@@ -447,25 +518,19 @@ export default function GameView({
               locked ? undefined : setGuess
             }
           />
-
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            className="absolute right-2 top-2 z-[1200] rounded bg-black/60 px-2 py-1 text-xs sm:hidden"
-            aria-label="Haritayı büyüt veya küçült"
-          >
-            ⤢
-          </button>
         </div>
 
         {err && (
-          <p className="rounded bg-rose-950/80 px-3 py-1 text-xs text-rose-300">
+          <p
+            role="alert"
+            className="rounded-xl border border-rose-400/20 bg-rose-950/90 px-3 py-2 text-xs text-rose-200"
+          >
             {err}
           </p>
         )}
 
         {locked ? (
-          <div className="rounded-xl bg-slate-800/90 px-4 py-3 text-center text-sm text-slate-300">
+          <div className="rounded-xl border border-white/10 bg-[#071522]/95 px-4 py-3 text-center text-sm font-semibold text-slate-300">
             {lockedMessage ?? 'Tahmin gönderildi'}
           </div>
         ) : (
@@ -473,13 +538,13 @@ export default function GameView({
             type="button"
             onClick={() => void submit()}
             disabled={!guess || busy}
-            className="rounded-xl bg-brand py-3 font-bold text-slate-950 transition enabled:hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-400"
+            className="min-h-12 touch-manipulation rounded-xl bg-cyan-300 px-4 py-3 text-sm font-black text-[#07111d] shadow-xl transition enabled:hover:bg-cyan-200 enabled:active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#172b3a] disabled:text-slate-400"
           >
             {busy
-              ? 'Gönderiliyor…'
+              ? 'Tahmin gönderiliyor…'
               : guess
-                ? 'Tahmin Et'
-                : 'Haritada bir yer seç'}
+                ? 'TAHMİNİ ONAYLA ↗'
+                : 'HARİTADAN KONUM SEÇ'}
           </button>
         )}
       </div>
